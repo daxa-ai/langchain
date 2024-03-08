@@ -36,10 +36,10 @@ class PebbloRetrievalQA(RetrievalQA):
                 "authorized_identities already exists in search_kwargs['filter']"
             )
 
-        search_kwargs.setdefault("filter", {})["authorized_identities"] = (
-            self.auth_context
-        )
-
+        self.validate_auth_context()
+        search_kwargs.setdefault("filter", {})[
+            "authorized_identities"
+        ] = self.auth_context
         docs = super()._get_docs(question, run_manager=run_manager)
         return docs
 
@@ -56,3 +56,10 @@ class PebbloRetrievalQA(RetrievalQA):
     def _chain_type(self) -> str:
         """Return the chain type."""
         return "pebblo_retrieval_qa"
+
+    def validate_auth_context(self):
+        """
+        Validate auth_context
+        """
+        if not isinstance(self.auth_context, dict):
+            raise ValueError("auth_context must be a dictionary")
