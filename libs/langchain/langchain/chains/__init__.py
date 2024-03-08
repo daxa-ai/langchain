@@ -64,13 +64,13 @@ from langchain.chains.openai_functions import (
     create_tagging_chain,
     create_tagging_chain_pydantic,
 )
+from langchain.chains.pebblo_retrieval import PebbloRetrievalQA
 from langchain.chains.qa_generation.base import QAGenerationChain
 from langchain.chains.qa_with_sources.base import QAWithSourcesChain
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.qa_with_sources.vector_db import VectorDBQAWithSourcesChain
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.chains.retrieval_qa.base import (
-    PebbloRetrievalQA,
     RetrievalQA,
     VectorDBQA,
 )
