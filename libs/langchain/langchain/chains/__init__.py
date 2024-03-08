@@ -64,7 +64,7 @@ from langchain.chains.openai_functions import (
     create_tagging_chain,
     create_tagging_chain_pydantic,
 )
-from langchain.chains.pebblo_retrieval import PebbloRetrievalQA
+from langchain.chains.pebblo_retrieval.base import PebbloRetrievalQA
 from langchain.chains.qa_generation.base import QAGenerationChain
 from langchain.chains.qa_with_sources.base import QAWithSourcesChain
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
