@@ -114,7 +114,6 @@ from langchain_community.document_loaders.google_speech_to_text import (
 )
 from langchain_community.document_loaders.googledrive import (
     GoogleDriveLoader,
-    GoogleDriveIdentityLoader
 )
 from langchain_community.document_loaders.gutenberg import GutenbergLoader
 from langchain_community.document_loaders.hn import HNLoader
@@ -323,7 +322,6 @@ __all__ = [
     "GoogleApiYoutubeLoader",
     "GoogleSpeechToTextLoader",
     "GoogleDriveLoader",
-    "GoogleDriveIdentityLoader",
     "GutenbergLoader",
     "HNLoader",
     "HuggingFaceDatasetLoader",
