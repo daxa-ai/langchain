@@ -51,19 +51,30 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
 
     def _get_identity_metadata_from_id(self, id: str):
         """Fetch the list of people having access to ID file."""
-        from googleapiclient.discovery import build
+        try:
+            from googleapiclient.discovery import build
+        except ImportError as exc:
+            raise ImportError(
+                "You must run "
+                "`pip install --upgrade "
+                "google-api-python-client` "
+                "to load authorization identities."
+            ) from exc
+
         authorized_identities = []
         creds = self._load_credentials()
-        service = build('drive', 'v3', credentials=creds)  # Build the service
+        service = build("drive", "v3", credentials=creds)  # Build the service
         permissions = service.permissions().list(fileId=id).execute()
-        for perm in permissions.get('permissions', {}):
-            email_id = service.permissions().get(
-                fileId=id, permissionId=perm.get('id', ''),
-                fields='emailAddress'
-                ).execute().get('emailAddress')
+        for perm in permissions.get("permissions", {}):
+            email_id = (
+                service.permissions()
+                .get(fileId=id, permissionId=perm.get("id", ""), fields="emailAddress")
+                .execute()
+                .get("emailAddress")
+            )
             if email_id:
                 authorized_identities.append(email_id)
-                
+
         return authorized_identities
 
     @root_validator
@@ -202,7 +213,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                     "row": i,
                 }
                 if self.load_auth:
-                    metadata['authorized_identities'] = authorized_identities
+                    metadata["authorized_identities"] = authorized_identities
                 content = []
                 for j, v in enumerate(row):
                     title = header[j].strip() if len(header) > j else ""
@@ -252,7 +263,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             "when": f"{file.get('modifiedTime')}",
         }
         if self.load_auth:
-            metadata['authorized_identities'] = authorized_identities
+            metadata["authorized_identities"] = authorized_identities
         return Document(page_content=text, metadata=metadata)
 
     def _load_documents_from_folder(
@@ -346,7 +357,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             for doc in docs:
                 doc.metadata["source"] = f"https://drive.google.com/file/d/{id}/view"
                 if self.load_auth:
-                    doc.metadata['authorized_identities'] = authorized_identities
+                    doc.metadata["authorized_identities"] = authorized_identities
                 if "title" not in doc.metadata:
                     doc.metadata["title"] = f"{file.get('name')}"
             return docs
@@ -358,17 +369,19 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             pdf_reader = PdfReader(BytesIO(content))
             docs = []
             for i, page in enumerate(pdf_reader.pages):
-                metadata={
+                metadata = {
                     "source": f"https://drive.google.com/file/d/{id}/view",
                     "title": f"{file.get('name')}",
                     "page": i,
                 }
                 if self.load_auth:
-                    metadata['authorized_identities'] = authorized_identities
-                docs.append(Document(
+                    metadata["authorized_identities"] = authorized_identities
+                docs.append(
+                    Document(
                         page_content=page.extract_text(),
                         metadata=metadata,
-                    ))
+                    )
+                )
             return docs
 
     def _load_file_from_ids(self) -> List[Document]:
