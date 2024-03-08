@@ -70,6 +70,7 @@ from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesCha
 from langchain.chains.qa_with_sources.vector_db import VectorDBQAWithSourcesChain
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.chains.retrieval_qa.base import (
+    PebbloRetrievalQA,
     RetrievalQA,
     VectorDBQA,
 )
@@ -123,6 +124,7 @@ __all__ = [
     "OpenAPIEndpointChain",
     "QAGenerationChain",
     "QAWithSourcesChain",
+    "PebbloRetrievalQA",
     "ReduceDocumentsChain",
     "RefineDocumentsChain",
     "RetrievalQA",
