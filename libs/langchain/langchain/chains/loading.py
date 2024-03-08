@@ -25,11 +25,11 @@ from langchain.chains.llm import LLMChain
 from langchain.chains.llm_checker.base import LLMCheckerChain
 from langchain.chains.llm_math.base import LLMMathChain
 from langchain.chains.llm_requests import LLMRequestsChain
+from langchain.chains.pebblo_retrieval.base import PebbloRetrievalQA
 from langchain.chains.qa_with_sources.base import QAWithSourcesChain
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain.chains.qa_with_sources.vector_db import VectorDBQAWithSourcesChain
 from langchain.chains.retrieval_qa.base import (
-    PebbloRetrievalQA,
     RetrievalQA,
     VectorDBQA,
 )
