@@ -1,4 +1,7 @@
-"""Pebblo Retrieval Chain with Identity & Semantic Enforcement for question-answering against a vector database."""
+"""
+Pebblo Retrieval Chain with Identity & Semantic Enforcement for question-answering
+against a vector database.
+"""
 
 from typing import List
 
@@ -7,13 +10,20 @@ from langchain_core.callbacks import (
     CallbackManagerForChainRun,
 )
 from langchain_core.documents import Document
-from pydantic import Field
+from langchain_core.pydantic_v1 import Field
+from langchain_core.vectorstores import VectorStoreRetriever
 
 from langchain.chains.retrieval_qa.base import RetrievalQA
 
 
 class PebbloRetrievalQA(RetrievalQA):
-    """Retrieval Chain with Identity & Semantic Enforcement for question-answering against a vector database."""
+    """
+    Retrieval Chain with Identity & Semantic Enforcement for question-answering
+    against a vector database.
+    """
+
+    retriever: VectorStoreRetriever = Field(exclude=True)
+    """VectorStore to use for retrieval."""
 
     auth_context: dict = Field(exclude=True)
     """Auth context to use in the retriever."""
@@ -57,7 +67,7 @@ class PebbloRetrievalQA(RetrievalQA):
         """Return the chain type."""
         return "pebblo_retrieval_qa"
 
-    def validate_auth_context(self):
+    def validate_auth_context(self) -> None:
         """
         Validate auth_context
         """
