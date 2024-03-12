@@ -3,14 +3,15 @@ Pebblo Retrieval Chain with Identity & Semantic Enforcement for question-answeri
 against a vector database.
 """
 
-from typing import List
+from typing import Any, List
 
+from langchain_community.vectorstores.pinecone import Pinecone
 from langchain_core.callbacks import (
     AsyncCallbackManagerForChainRun,
     CallbackManagerForChainRun,
 )
 from langchain_core.documents import Document
-from langchain_core.pydantic_v1 import Field
+from langchain_core.pydantic_v1 import Field, validator
 from langchain_core.vectorstores import VectorStoreRetriever
 
 from langchain.chains.retrieval_qa.base import RetrievalQA
@@ -46,7 +47,6 @@ class PebbloRetrievalQA(RetrievalQA):
                 "authorized_identities already exists in search_kwargs['filter']"
             )
 
-        self.validate_auth_context()
         search_kwargs.setdefault("filter", {})[
             "authorized_identities"
         ] = self.auth_context
@@ -67,9 +67,31 @@ class PebbloRetrievalQA(RetrievalQA):
         """Return the chain type."""
         return "pebblo_retrieval_qa"
 
-    def validate_auth_context(self) -> None:
+    @validator("auth_context")
+    def validate_auth_context(cls, auth_context: Any) -> dict:
         """
         Validate auth_context
         """
-        if not isinstance(self.auth_context, dict):
+        # auth_context must be a dictionary
+        if not isinstance(auth_context, dict):
             raise ValueError("auth_context must be a dictionary")
+        return auth_context
+
+    @validator("retriever", pre=True, always=True)
+    def validate_vectorstore(
+        cls, retriever: VectorStoreRetriever
+    ) -> VectorStoreRetriever:
+        """
+        Validate that the vectorstore of the retriever is supported vectorstores.
+        """
+        supported_vectorstores = [Pinecone]
+        if not any(
+            isinstance(retriever.vectorstore, supported_class)
+            for supported_class in supported_vectorstores
+        ):
+            raise ValueError(
+                f"vectorstore must be an instance of one of the supported "
+                f"vectorstores: {supported_vectorstores}. "
+                f"Got {type(retriever.vectorstore).__name__} instead."
+            )
+        return retriever
