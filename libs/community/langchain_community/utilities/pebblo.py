@@ -4,19 +4,20 @@ import logging
 import os
 import pathlib
 import platform
+from enum import Enum
 from typing import Optional, Tuple
 
 from langchain_core.env import get_runtime_environment
 from langchain_core.pydantic_v1 import BaseModel
-
 from langchain_community.document_loaders.base import BaseLoader
+
 
 logger = logging.getLogger(__name__)
 
 PLUGIN_VERSION = "0.1.0"
-CLASSIFIER_URL = os.getenv("PEBBLO_CLASSIFIER_URL", "http://localhost:8000")
+IP_INFO_URL = "https://ipinfo.io/ip"
+CLASSIFIER_URL = os.getenv("PEBBLO_CLASSIFIER_URL", "http://localhost:8000/v1")
 
-# Supported loaders for Pebblo safe data loading
 file_loader = [
     "JSONLoader",
     "S3FileLoader",
@@ -29,13 +30,24 @@ file_loader = [
     "AmazonTextractPDFLoader",
     "CSVLoader",
     "UnstructuredExcelLoader",
-]
-dir_loader = ["DirectoryLoader", "S3DirLoader", "PyPDFDirectoryLoader"]
+    "UnstructuredEmailLoader",
+    ]
+
+dir_loader = [
+    "DirectoryLoader",
+    "S3DirLoader",
+    "SlackDirectoryLoader",
+    "PyPDFDirectoryLoader",
+    "NotionDirectoryLoader",
+    ]
+
 in_memory = ["DataFrameLoader"]
 
-LOADER_TYPE_MAPPING = {"file": file_loader, "dir": dir_loader, "in-memory": in_memory}
+remote_db = ["NotionDBLoader", "GoogleDriveLoader",]
 
-SUPPORTED_LOADERS = (*file_loader, *dir_loader, *in_memory)
+LOADER_TYPE_MAPPING = {"file": file_loader, "dir": dir_loader, "in-memory": in_memory, "remote_db": remote_db}
+
+SUPPORTED_LOADERS = (*file_loader, *dir_loader, *in_memory, *remote_db)
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +67,7 @@ class Runtime(BaseModel):
         language_version (str): version of current runtime kernel.
         runtime (Optional[str]) More runtime details. Defaults to ""
     """
-
-    type: str = "local"
+    type: Optional[str] = ""
     host: str
     path: str
     ip: Optional[str] = ""
@@ -65,7 +76,7 @@ class Runtime(BaseModel):
     os_version: str
     language: str
     language_version: str
-    runtime: str = "local"
+    runtime: Optional[str] = ""
 
 
 class Framework(BaseModel):
@@ -75,7 +86,6 @@ class Framework(BaseModel):
         name (str): Name of the Framework.
         version (str): Version of the Framework.
     """
-
     name: str
     version: str
 
@@ -92,7 +102,6 @@ class App(BaseModel):
         framework (Framework): Framework details of the app
         plugin_version (str): Plugin version used for the app.
     """
-
     name: str
     owner: str
     description: Optional[str]
@@ -147,7 +156,7 @@ def get_full_path(path: str) -> str:
     return str(full_path)
 
 
-def get_loader_type(loader: str) -> str:
+def get_loader_type(loader: str):
     """Return loader type among, file, dir or in-memory.
 
     Args:
@@ -162,7 +171,7 @@ def get_loader_type(loader: str) -> str:
     return "unknown"
 
 
-def get_loader_full_path(loader: BaseLoader) -> str:
+def get_loader_full_path(loader: BaseLoader):
     """Return absolute source path of source of loader based on the
     keys present in Document object from loader.
 
@@ -173,6 +182,7 @@ def get_loader_full_path(loader: BaseLoader) -> str:
         DataFrameLoader,
         GCSFileLoader,
         S3FileLoader,
+        NotionDBLoader,
     )
 
     location = "-"
@@ -181,24 +191,27 @@ def get_loader_full_path(loader: BaseLoader) -> str:
             "loader is not derived from BaseLoader, source location will be unknown!"
         )
         return location
-    loader_dict = loader.__dict__
-    try:
-        if "bucket" in loader_dict:
-            if isinstance(loader, GCSFileLoader):
-                location = f"gc://{loader.bucket}/{loader.blob}"
-            elif isinstance(loader, S3FileLoader):
-                location = f"s3://{loader.bucket}/{loader.key}"
-        elif "path" in loader_dict:
-            location = loader_dict["path"]
-        elif "file_path" in loader_dict:
-            location = loader_dict["file_path"]
-        elif "web_paths" in loader_dict:
-            location = loader_dict["web_paths"][0]
-        # For in-memory types:
-        elif isinstance(loader, DataFrameLoader):
-            location = "in-memory"
-    except Exception:
-        pass
+    loader_keys = loader.__dict__.keys()
+    if "bucket" in loader_keys:
+        if isinstance(loader, GCSFileLoader):
+            location = f"gc://{loader.bucket}/{loader.blob}"
+        elif isinstance(loader, S3FileLoader):
+            location = f"s3://{loader.bucket}/{loader.key}"
+    elif "source" in loader_keys:
+        location = f"{loader.source}"
+        if "channel" in loader_keys:
+            location = f"{location}/{loader.channel}"
+    elif "path" in loader_keys:
+        location = loader.path
+    elif "file_path" in loader_keys:
+        location = loader.file_path
+    elif "web_paths" in loader_keys:
+        location = loader.web_paths[0]
+    # For in-memory types:
+    elif isinstance(loader, DataFrameLoader):
+        location = "in-memory"
+    elif isinstance(loader, NotionDBLoader):
+        location = location = f"notiondb://{loader.database_id}"
     return get_full_path(str(location))
 
 
@@ -219,31 +232,55 @@ def get_runtime() -> Tuple[Framework, Runtime]:
         platform=runtime_env.get("platform", "unknown"),
         os=uname.system,
         os_version=uname.version,
-        ip=get_ip(),
         language=runtime_env.get("runtime", "unknown"),
         language_version=runtime_env.get("runtime_version", "unknown"),
     )
 
     if "Darwin" in runtime.os:
         runtime.type = "desktop"
-        runtime.runtime = "Mac OSX"
+        logger.debug("MacOS")
+        local_runtime = get_local_runtime("local")
+        runtime.ip = local_runtime.get("ip", "")
+        runtime.runtime = local_runtime.get("runtime", "local")
+        return framework, runtime
 
-    logger.debug(f"framework {framework}")
+    curr_runtime = get_local_runtime("local")
+
+    runtime.type = curr_runtime.get("type", "unknown")
+    runtime.ip = curr_runtime.get("ip", "")
+    runtime.runtime = curr_runtime.get("runtime", "unknown")
+
     logger.debug(f"runtime {runtime}")
+    logger.debug(f"framework {framework}")
     return framework, runtime
 
 
-def get_ip() -> str:
-    """Fetch local runtime ip address
+def get_local_runtime(service):
+    """Fetch local runtime details
+
+    Args:
+        service (str): `local`
 
     Returns:
-        str: IP address
+        dict: Runtime details.
     """
     import socket  # lazy imports
+
+    import requests
 
     host = socket.gethostname()
     try:
         public_ip = socket.gethostbyname(host)
     except Exception:
         public_ip = socket.gethostbyname("localhost")
-    return public_ip
+    path = os.getcwd()
+    name = host
+    runtime = {
+        "type": "local",
+        "host": host,
+        "path": path,
+        "ip": public_ip,
+        "name": name,
+        "runtime": service,
+    }
+    return runtime
