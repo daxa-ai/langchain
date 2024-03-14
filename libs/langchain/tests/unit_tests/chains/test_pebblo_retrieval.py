@@ -5,6 +5,7 @@ from typing import List
 from unittest.mock import Mock
 
 import pytest
+from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.vectorstores.pinecone import Pinecone
 from langchain_core.callbacks import (
     AsyncCallbackManagerForRetrieverRun,
@@ -36,14 +37,6 @@ class FakeRetriever(VectorStoreRetriever):
         return [Document(page_content=query)]
 
 
-class UnsupportedVectorStore(VectorStore):
-    """
-    Unsupported vectorstore class for testing
-    """
-
-    pass
-
-
 @pytest.fixture
 def unsupported_retriever() -> FakeRetriever:
     """
@@ -52,7 +45,7 @@ def unsupported_retriever() -> FakeRetriever:
     retriever = FakeRetriever()
     retriever.search_kwargs = {}
     # Set the class of vectorstore to Chroma
-    retriever.vectorstore.__class__ = UnsupportedVectorStore
+    retriever.vectorstore.__class__ = Chroma
     return retriever
 
 
@@ -155,7 +148,6 @@ def test_validate_vectorstore(
     )
 
     # Test with an unsupported vectorstore
-    # with pytest.raises(ValueError):
     with pytest.raises(ValueError) as exc_info:
         _ = PebbloRetrievalQA.from_chain_type(
             llm=FakeLLM(),
