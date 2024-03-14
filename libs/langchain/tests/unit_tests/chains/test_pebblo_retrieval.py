@@ -14,6 +14,7 @@ from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
 
 from langchain.chains.pebblo_retrieval.base import PebbloRetrievalQA
+from langchain.chains.retrieval_qa.base import BaseRetrievalQA
 from tests.unit_tests.llms.fake_llm import FakeLLM
 
 
@@ -68,13 +69,13 @@ def retriever() -> FakeRetriever:
 
 
 @pytest.fixture
-def pebblo_retrieval_qa(retriever: FakeRetriever) -> PebbloRetrievalQA:
+def pebblo_retrieval_qa(retriever: FakeRetriever) -> BaseRetrievalQA:
     """
     Create a PebbloRetrievalQA instance
     """
     # Create a fake auth context
     auth_context = {"authorized_identities": ["fake_user", "fake_user2"]}
-    pebblo_retrieval_qa: PebbloRetrievalQA = PebbloRetrievalQA.from_chain_type(
+    pebblo_retrieval_qa = PebbloRetrievalQA.from_chain_type(
         llm=FakeLLM(),
         chain_type="stuff",
         retriever=retriever,
@@ -83,7 +84,7 @@ def pebblo_retrieval_qa(retriever: FakeRetriever) -> PebbloRetrievalQA:
     return pebblo_retrieval_qa
 
 
-def test_invoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
+def test_invoke(pebblo_retrieval_qa: BaseRetrievalQA) -> None:
     """
     Test that the invoke method returns a non-None result
     """
@@ -93,7 +94,7 @@ def test_invoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ainvoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
+async def test_ainvoke(pebblo_retrieval_qa: BaseRetrievalQA) -> None:
     """
     Test ainvoke method (async) raises NotImplementedError
     """
