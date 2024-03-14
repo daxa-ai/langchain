@@ -5,7 +5,7 @@ against a vector database.
 
 from typing import Any, List
 
-from langchain_community.vectorstores.pinecone import Pinecone
+from langchain_community.vectorstores import Pinecone, Qdrant, Weaviate
 from langchain_core.callbacks import (
     AsyncCallbackManagerForChainRun,
     CallbackManagerForChainRun,
@@ -15,6 +15,8 @@ from langchain_core.pydantic_v1 import Field, validator
 from langchain_core.vectorstores import VectorStoreRetriever
 
 from langchain.chains.retrieval_qa.base import RetrievalQA
+
+SUPPORTED_VECTORSTORES = [Pinecone, Weaviate, Qdrant]
 
 
 class PebbloRetrievalQA(RetrievalQA):
@@ -26,7 +28,7 @@ class PebbloRetrievalQA(RetrievalQA):
     retriever: VectorStoreRetriever = Field(exclude=True)
     """VectorStore to use for retrieval."""
 
-    auth_context: dict = Field(exclude=True)
+    auth_context: list = Field(exclude=True)
     """Auth context to use in the retriever."""
 
     def _get_docs(
@@ -36,20 +38,46 @@ class PebbloRetrievalQA(RetrievalQA):
         run_manager: CallbackManagerForChainRun,
     ) -> List[Document]:
         """Get docs."""
-
-        #  Identity Enforcement
+        # Identity Enforcement
         search_kwargs = self.retriever.search_kwargs
-        if (
-            "filter" in search_kwargs
-            and "authorized_identities" in search_kwargs["filter"]
-        ):
+        if isinstance(self.retriever.vectorstore, Pinecone):
+            if (
+                "filter" in search_kwargs
+                and "authorized_identities" in search_kwargs["filter"]
+            ):
+                raise ValueError(
+                    "authorized_identities already exists in search_kwargs['filter']"
+                )
+
+            search_kwargs.setdefault("filter", {})["authorized_identities"] = {
+                "$in": self.auth_context
+            }
+        elif isinstance(self.retriever.vectorstore, Qdrant):
+            from qdrant_client.http import models as rest
+
+            filters = rest.Filter(
+                must=[
+                    rest.FieldCondition(
+                        key="metadata.authorized_identities",
+                        match=rest.MatchAny(any=self.auth_context),
+                    )
+                ]
+            )
+            search_kwargs.setdefault("filter", filters)
+        elif isinstance(self.retriever.vectorstore, Weaviate):
+            where_filter = {
+                "path": ["authorized_identities"],
+                "operator": "ContainsAny",
+                "valueText": self.auth_context,
+            }
+            search_kwargs.setdefault("where_filter", where_filter)
+        else:
             raise ValueError(
-                "authorized_identities already exists in search_kwargs['filter']"
+                f"Vectorstore must be an instance of one of the supported "
+                f"vectorstores: {SUPPORTED_VECTORSTORES}. "
+                f"Got {type(self.retriever.vectorstore).__name__} instead."
             )
 
-        search_kwargs.setdefault("filter", {})[
-            "authorized_identities"
-        ] = self.auth_context
         docs = super()._get_docs(question, run_manager=run_manager)
         return docs
 
@@ -68,13 +96,13 @@ class PebbloRetrievalQA(RetrievalQA):
         return "pebblo_retrieval_qa"
 
     @validator("auth_context")
-    def validate_auth_context(cls, auth_context: Any) -> dict:
+    def validate_auth_context(cls, auth_context: Any) -> list:
         """
         Validate auth_context
         """
-        # auth_context must be a dictionary
-        if not isinstance(auth_context, dict):
-            raise ValueError("auth_context must be a dictionary")
+        # auth_context must be a list
+        if not isinstance(auth_context, list):
+            raise ValueError("auth_context must be a list")
         return auth_context
 
     @validator("retriever", pre=True, always=True)
@@ -84,14 +112,13 @@ class PebbloRetrievalQA(RetrievalQA):
         """
         Validate that the vectorstore of the retriever is supported vectorstores.
         """
-        supported_vectorstores = [Pinecone]
         if not any(
             isinstance(retriever.vectorstore, supported_class)
-            for supported_class in supported_vectorstores
+            for supported_class in SUPPORTED_VECTORSTORES
         ):
             raise ValueError(
-                f"vectorstore must be an instance of one of the supported "
-                f"vectorstores: {supported_vectorstores}. "
+                f"Vectorstore must be an instance of one of the supported "
+                f"vectorstores: {SUPPORTED_VECTORSTORES}. "
                 f"Got {type(retriever.vectorstore).__name__} instead."
             )
         return retriever

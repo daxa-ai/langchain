@@ -73,8 +73,8 @@ def pebblo_retrieval_qa(retriever: FakeRetriever) -> PebbloRetrievalQA:
     Create a PebbloRetrievalQA instance
     """
     # Create a fake auth context
-    auth_context = {"$in": ["fake_user", "fake_user2"]}
-    pebblo_retrieval_qa = PebbloRetrievalQA.from_chain_type(
+    auth_context = ["fake_user", "fake_user2"]
+    pebblo_retrieval_qa: PebbloRetrievalQA = PebbloRetrievalQA.from_chain_type(
         llm=FakeLLM(),
         chain_type="stuff",
         retriever=retriever,
@@ -106,7 +106,7 @@ def test_validate_auth_context(retriever: FakeRetriever) -> None:
     Test auth_context validation
     """
     # Test with valid auth_context
-    valid_auth_context = {"$in": ["fake_user", "fake_user2"]}
+    valid_auth_context = ["fake_user", "fake_user2"]
     _ = PebbloRetrievalQA.from_chain_type(
         llm=FakeLLM(),
         chain_type="stuff",
@@ -141,7 +141,7 @@ def test_validate_vectorstore(
     """
     Test vectorstore validation
     """
-    auth_context = {"$in": ["fake_user", "fake_user2"]}
+    auth_context = ["fake_user", "fake_user2"]
 
     # Test with a supported vectorstore (Pinecone)
     _ = PebbloRetrievalQA.from_chain_type(
