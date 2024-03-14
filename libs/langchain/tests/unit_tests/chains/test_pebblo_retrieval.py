@@ -73,7 +73,7 @@ def pebblo_retrieval_qa(retriever: FakeRetriever) -> PebbloRetrievalQA:
     Create a PebbloRetrievalQA instance
     """
     # Create a fake auth context
-    auth_context = ["fake_user", "fake_user2"]
+    auth_context = {"authorized_identities": ["fake_user", "fake_user2"]}
     pebblo_retrieval_qa: PebbloRetrievalQA = PebbloRetrievalQA.from_chain_type(
         llm=FakeLLM(),
         chain_type="stuff",
@@ -85,7 +85,7 @@ def pebblo_retrieval_qa(retriever: FakeRetriever) -> PebbloRetrievalQA:
 
 def test_invoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
     """
-    Test invoke method
+    Test that the invoke method returns a non-None result
     """
     question = "What is the meaning of life?"
     response = pebblo_retrieval_qa.invoke({"query": question})
@@ -95,7 +95,7 @@ def test_invoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
 @pytest.mark.asyncio
 async def test_ainvoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
     """
-    Test ainvoke method (async)
+    Test ainvoke method (async) raises NotImplementedError
     """
     with pytest.raises(NotImplementedError):
         _ = await pebblo_retrieval_qa.ainvoke({"query": "hello"})
@@ -103,10 +103,10 @@ async def test_ainvoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
 
 def test_validate_auth_context(retriever: FakeRetriever) -> None:
     """
-    Test auth_context validation
+    Test the auth_context validation with valid and invalid inputs
     """
     # Test with valid auth_context
-    valid_auth_context = ["fake_user", "fake_user2"]
+    valid_auth_context = {"authorized_identities": ["fake_user", "fake_user2"]}
     _ = PebbloRetrievalQA.from_chain_type(
         llm=FakeLLM(),
         chain_type="stuff",
@@ -115,24 +115,26 @@ def test_validate_auth_context(retriever: FakeRetriever) -> None:
     )
 
     # Test with invalid auth_context
-    invalid_auth_context = "invalid_auth_context"
-    with pytest.raises(ValueError):
+    invalid_auth_context = {"authorized_user": "fake_user"}
+    with pytest.raises(ValueError) as exc_info:
         _ = PebbloRetrievalQA.from_chain_type(
             llm=FakeLLM(),
             chain_type="stuff",
             retriever=retriever,
             auth_context=invalid_auth_context,
         )
+    assert "auth_context must contain 'authorized_identities'" in str(exc_info.value)
 
-    # Test with None auth_context
-    none_auth_context = None
-    with pytest.raises(ValueError):
+    # Test with  auth_context invalid authorized_identities
+    invalid_auth_context = {"authorized_identities": "fake_user"}
+    with pytest.raises(ValueError) as exc_info:
         _ = PebbloRetrievalQA.from_chain_type(
             llm=FakeLLM(),
             chain_type="stuff",
             retriever=retriever,
-            auth_context=none_auth_context,
+            auth_context=invalid_auth_context,
         )
+    assert "authorized_identities must be a list" in str(exc_info.value)
 
 
 def test_validate_vectorstore(
@@ -141,7 +143,7 @@ def test_validate_vectorstore(
     """
     Test vectorstore validation
     """
-    auth_context = ["fake_user", "fake_user2"]
+    auth_context = {"authorized_identities": ["fake_user", "fake_user2"]}
 
     # Test with a supported vectorstore (Pinecone)
     _ = PebbloRetrievalQA.from_chain_type(
@@ -152,10 +154,15 @@ def test_validate_vectorstore(
     )
 
     # Test with an unsupported vectorstore
-    with pytest.raises(ValueError):
+    # with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as exc_info:
         _ = PebbloRetrievalQA.from_chain_type(
             llm=FakeLLM(),
             chain_type="stuff",
             retriever=unsupported_retriever,
             auth_context=auth_context,
         )
+    assert (
+        "Vectorstore must be an instance of one of the supported vectorstores"
+        in str(exc_info.value)
+    )
