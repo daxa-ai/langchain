@@ -133,6 +133,7 @@ class PebbloSafeLoader(BaseLoader):
             page_content = str(doc.get("page_content"))
             page_content_size = self.calculate_content_size(page_content)
             self.source_aggr_size += page_content_size
+            doc_authorized_identities = doc.get("metadata", {}).get("authorized_identities", [])
             docs.append(
                 {
                     "doc": page_content,
@@ -142,6 +143,11 @@ class PebbloSafeLoader(BaseLoader):
                     **(
                         {"source_path_size": doc_source_size}
                         if doc_source_size is not None
+                        else {}
+                    ),
+                    **(
+                        {"authorized_identities": doc_authorized_identities}
+                        if doc_authorized_identities
                         else {}
                     ),
                 }
