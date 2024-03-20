@@ -170,10 +170,10 @@ class PebbloSafeLoader(BaseLoader):
         load_doc_url = f"{CLASSIFIER_URL}/v1/loader/doc"
         try:
             resp = requests.post(
-                load_doc_url, headers=headers, json=payload, timeout=20
+                load_doc_url, headers=headers, json=payload, timeout=5
             )
             if resp.status_code not in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
-                logger.warning(
+                logger.debug(
                     f"Received unexpected HTTP response code: {resp.status_code}"
                 )
             logger.debug(
@@ -184,9 +184,9 @@ class PebbloSafeLoader(BaseLoader):
                     response status{resp.status_code} body {resp.json()}"
             )
         except requests.exceptions.RequestException:
-            logger.warning("Unable to reach pebblo server.")
+            logger.debug("Unable to reach pebblo server.")
         except Exception:
-            logger.warning("An Exception caught in _send_loader_doc.")
+            logger.debug("An Exception caught in _send_loader_doc.")
         if loading_end is True:
             PebbloSafeLoader.set_loader_sent()
 
@@ -215,7 +215,7 @@ class PebbloSafeLoader(BaseLoader):
         app_discover_url = f"{CLASSIFIER_URL}/v1/app/discover"
         try:
             resp = requests.post(
-                app_discover_url, headers=headers, json=payload, timeout=20
+                app_discover_url, headers=headers, json=payload, timeout=5
             )
             logger.debug(
                 f"send_discover: request \
@@ -228,13 +228,13 @@ class PebbloSafeLoader(BaseLoader):
             if resp.status_code in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
                 PebbloSafeLoader.set_discover_sent()
             else:
-                logger.warning(
+                logger.debug(
                     f"Received unexpected HTTP response code: {resp.status_code}"
                 )
         except requests.exceptions.RequestException:
-            logger.warning("Unable to reach pebblo server.")
+            logger.debug("Unable to reach pebblo server.")
         except Exception:
-            logger.warning("An Exception caught in _send_discover.")
+            logger.debug("An Exception caught in _send_discover.")
 
     def _get_app_details(self) -> App:
         """Fetch app details. Internal method.
