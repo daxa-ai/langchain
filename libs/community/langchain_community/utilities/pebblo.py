@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 PLUGIN_VERSION = "0.1.0"
 CLASSIFIER_URL = os.getenv("PEBBLO_CLASSIFIER_URL", "http://localhost:8000")
+PEBBLO_CLOUD_URL = os.getenv("PEBBLO_CLOUD_URL", "https://api.daxa.ai")
 
 # Supported loaders for Pebblo safe data loading
 file_loader = [
@@ -141,7 +142,7 @@ def get_full_path(path: str) -> str:
         or ("://" in path)
         or ("/" == path[0])
         or (path in ["unknown", "-", "in-memory"])
-    ):
+        ):
         return path
     full_path = pathlib.Path(path).resolve()
     return str(full_path)
