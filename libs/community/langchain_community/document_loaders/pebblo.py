@@ -17,6 +17,7 @@ from langchain_community.utilities.pebblo import (
     PLUGIN_VERSION,
     App,
     Doc,
+    IndexedDocument,
     get_full_path,
     get_loader_full_path,
     get_loader_type,
@@ -42,18 +43,23 @@ class PebbloSafeLoader(BaseLoader):
         description: str = "",
         api_key: Optional[str] = None,
 
+        load_semantic: Optional[bool] = False,
+
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
         self.app_name = name
-        self.api_key = api_key
+
+        self.api_key = os.environ.get("DAXA_API_KEY") or api_key
         self.load_id = str(uuid.uuid4())
         self.loader = langchain_loader
+        self.load_semantic = os.environ.get("LOAD_SEMANTIC") or load_semantic
         self.owner = owner
         self.description = description
         self.source_path = get_loader_full_path(self.loader)
         self.source_owner = PebbloSafeLoader.get_file_owner_from_path(self.source_path)
         self.docs: List[Document] = []
+        self.docs_with_id: List[IndexedDocument] = []
         loader_name = str(type(self.loader)).split(".")[-1].split("'")[0]
         self.source_type = get_loader_type(loader_name)
         self.source_path_size = self.get_source_size(self.source_path)
@@ -79,7 +85,13 @@ class PebbloSafeLoader(BaseLoader):
             list: Documents fetched from load method of the wrapped `loader`.
         """
         self.docs = self.loader.load()
-        self._send_loader_doc(loading_end=True)
+        if not self.load_semantic:
+            self._classify_doc(self.docs, loading_end=True)
+            return self.docs
+        self.docs_with_id = self._index_docs()
+        classified_docs = self._classify_doc(self.docs_with_id, loading_end=True)
+        self.docs_with_id = self._add_semantic_metadata(self.docs_with_id, classified_docs)
+        self.docs = self._unindex_docs(self.docs_with_id)
         return self.docs
 
     def lazy_load(self) -> Iterator[Document]:
@@ -101,14 +113,18 @@ class PebbloSafeLoader(BaseLoader):
         while True:
             try:
                 doc = next(doc_iterator)
+                self.docs = [doc,]
+                self.docs_with_id = self._index_docs()
             except StopIteration:
                 self.docs = []
-                self._send_loader_doc(loading_end=True)
+                classified_docs = self._classify_doc(
+                    self.docs_with_id, loading_end=True
+                    )
                 break
             self.docs = [
                 doc,
             ]
-            self._send_loader_doc()
+            classified_docs = self._classify_doc(self.docs_with_id)
             yield doc
 
     @classmethod
@@ -119,10 +135,13 @@ class PebbloSafeLoader(BaseLoader):
     def set_loader_sent(cls) -> None:
         cls._loader_sent = True
 
-    def _send_loader_doc(self, loading_end: bool = False) -> None:
-        """Send documents fetched from loader to pebblo-server. Internal method.
+    def _classify_doc(self, loaded_docs: list, loading_end: bool = False) -> list:
+        """Send documents fetched from loader to pebblo-server. Then send
+        classified documents to Daxa cloud(If api_key is present). Internal method.
 
         Args:
+
+            loaded_docs (list): List of documents fetched from loader's load operation.
             loading_end (bool, optional): Flag indicating the halt of data
                                           loading by loader. Defaults to False.
         """
@@ -130,7 +149,11 @@ class PebbloSafeLoader(BaseLoader):
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
-        doc_content = [doc.dict() for doc in self.docs]
+
+        if loading_end is True:
+            PebbloSafeLoader.set_loader_sent()
+        doc_content = [doc.dict() for doc in loaded_docs]
+
         docs = []
         for doc in doc_content:
             doc_source_path = get_full_path(
@@ -143,10 +166,12 @@ class PebbloSafeLoader(BaseLoader):
             page_content = str(doc.get("page_content"))
             page_content_size = self.calculate_content_size(page_content)
             self.source_aggregate_size += page_content_size
+            doc_id = doc.get("id")
             docs.append(
                 {
                     "doc": page_content,
                     "source_path": doc_source_path,
+                    "id": doc_id,
                     "last_modified": doc.get("metadata", {}).get("last_modified"),
                     "file_owner": doc_source_owner,
                     **(
@@ -195,10 +220,17 @@ class PebbloSafeLoader(BaseLoader):
             logger.warning("Unable to reach pebblo server.")
         except Exception as e:
             logger.warning("An Exception caught in _send_loader_doc: %s", e)
+        finally:
+            classified_docs=json.loads(pebblo_resp.text).get('docs', None)
+            if not isinstance(classified_docs, list):
+                classified_docs = None
 
         if self.api_key:
             try:
-                payload['docs'] = json.loads(pebblo_resp.text)['docs']
+                if not classified_docs:
+                    logger.warning("No classified docs to send to Daxa cloud.")
+                    return
+                payload['docs'] = classified_docs
                 payload['classified'] = True
                 headers.update({"x-api-key": self.api_key})
                 pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}/v1/loader/doc"
@@ -221,8 +253,11 @@ class PebbloSafeLoader(BaseLoader):
             except Exception as e:
                 logger.warning("An Exception caught in _send_loader_doc: %s", e)
 
+
         if loading_end is True:
             PebbloSafeLoader.set_loader_sent()
+
+        return classified_docs
 
     @staticmethod
     def calculate_content_size(page_content: str) -> int:
@@ -339,3 +374,56 @@ class PebbloSafeLoader(BaseLoader):
                         total_size += os.path.getsize(fp)
             size = total_size
         return size
+
+    def _index_docs(self) -> List[IndexedDocument]:
+        """
+        Indexes the documents and returns a list of IndexedDocument objects.
+
+        Returns:
+            List[IndexedDocument]: A list of IndexedDocument objects with unique IDs.
+        """
+        docs_with_id = [IndexedDocument(id=hex(i)[2:], **doc.dict())
+                        for i, doc in enumerate(self.docs)]
+        return docs_with_id
+
+    def _add_semantic_metadata(self, docs_with_id: List[IndexedDocument], classified_docs: List[dict]) -> List[Document]:
+        """
+        Adds semantic metadata to the given list of documents.
+
+        Args:
+            docs_with_id (List[IndexedDocument]): A list of IndexedDocument objects
+                containing the documents with their IDs.
+            classified_docs (List[dict]): A list of dictionaries containing the
+                classified documents.
+
+        Returns:
+            List[Document]: A list of Document objects with added semantic metadata.
+        """
+        indexed_docs = {
+            doc.id: Document(page_content=doc.page_content, metadata=doc.metadata)
+            for doc in docs_with_id
+            }
+
+        for classified_doc in classified_docs:
+            doc_id = classified_doc.get("id")
+            if doc_id in indexed_docs:
+                indexed_docs[doc_id].metadata["pebblo_semantic_entities"] = classified_doc.get("entities", [])
+                indexed_docs[doc_id].metadata["pebblo_semantic_topics"] = classified_doc.get("topics", [])
+
+        semantic_metadata_docs = [doc for doc in indexed_docs.values()]
+
+        return semantic_metadata_docs
+
+    def _unindex_docs(self, docs_with_id: List[IndexedDocument]) -> List[Document]:
+        """
+        Converts a list of IndexedDocument objects to a list of Document objects.
+
+        Args:
+            docs_with_id (List[IndexedDocument]): A list of IndexedDocument objects.
+
+        Returns:
+            List[Document]: A list of Document objects.
+        """
+        docs = [Document(page_content=doc.page_content, metadata=doc.metadata)
+                for i, doc in enumerate(docs_with_id)]
+        return docs
