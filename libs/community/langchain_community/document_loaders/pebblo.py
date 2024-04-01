@@ -43,7 +43,6 @@ class PebbloSafeLoader(BaseLoader):
         description: str = "",
         api_key: Optional[str] = None,
         load_semantic: Optional[bool] = False,
-
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
@@ -88,7 +87,9 @@ class PebbloSafeLoader(BaseLoader):
             return self.docs
         self.docs_with_id = self._index_docs()
         classified_docs = self._classify_doc(self.docs_with_id, loading_end=True)
-        self.docs_with_id = self._add_semantic_metadata(self.docs_with_id, classified_docs)
+        self.docs_with_id = self._add_semantic_metadata(
+            self.docs_with_id, classified_docs
+        )
         self.docs = self._unindex_docs(self.docs_with_id)
         return self.docs
 
@@ -111,13 +112,15 @@ class PebbloSafeLoader(BaseLoader):
         while True:
             try:
                 doc = next(doc_iterator)
-                self.docs = [doc,]
+                self.docs = [
+                    doc,
+                ]
                 self.docs_with_id = self._index_docs()
             except StopIteration:
                 self.docs = []
                 classified_docs = self._classify_doc(
                     self.docs_with_id, loading_end=True
-                    )
+                )
                 break
             self.docs = [
                 doc,
@@ -190,8 +193,9 @@ class PebbloSafeLoader(BaseLoader):
         if loading_end is True:
             payload["loading_end"] = "true"
             if "loader_details" in payload:
-                payload["loader_details"]["source_aggregate_size"] = \
+                payload["loader_details"]["source_aggregate_size"] = (
                     self.source_aggregate_size
+                )
         payload = Doc(**payload).dict(exclude_unset=True)
         load_doc_url = f"{CLASSIFIER_URL}/v1/loader/doc"
         try:
@@ -201,7 +205,7 @@ class PebbloSafeLoader(BaseLoader):
             if pebblo_resp.status_code not in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
                 logger.warning(
                     "Received unexpected HTTP response code: %s",
-                    pebblo_resp.status_code
+                    pebblo_resp.status_code,
                 )
             logger.debug(
                 "send_loader_doc: request url %s, body %s len %s response status %s\
@@ -211,13 +215,13 @@ class PebbloSafeLoader(BaseLoader):
                 str(len(pebblo_resp.request.body if pebblo_resp.request.body else [])),
                 str(pebblo_resp.status_code),
                 pebblo_resp.json(),
-                )
+            )
         except requests.exceptions.RequestException:
             logger.warning("Unable to reach pebblo server.")
         except Exception as e:
             logger.warning("An Exception caught in _send_loader_doc: %s", e)
         finally:
-            classified_docs=json.loads(pebblo_resp.text).get('docs', None)
+            classified_docs = json.loads(pebblo_resp.text).get("docs", None)
             if not isinstance(classified_docs, list):
                 classified_docs = None
 
@@ -226,23 +230,27 @@ class PebbloSafeLoader(BaseLoader):
                 if not classified_docs:
                     logger.warning("No classified docs to send to Daxa cloud.")
                     return
-                payload['docs'] = classified_docs
-                payload['classified'] = True
+                payload["docs"] = classified_docs
+                payload["classified"] = True
                 headers.update({"x-api-key": self.api_key})
                 pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}/v1/loader/doc"
                 daxa_response = requests.post(
                     pebblo_cloud_url, headers=headers, json=payload, timeout=20
                 )
                 logger.debug(
-                "send_loader_doc: request url %s, body %s len %s response status %s\
-                body %s",
-                daxa_response.request.url,
-                str(daxa_response.request.body)[:999],
-                str(len(
-                        daxa_response.request.body if daxa_response.request.body else []
-                        )),
-                str(daxa_response.status_code),
-                daxa_response.json(),
+                    "send_loader_doc: request url %s, body %s len %s response status %s\
+                    body %s",
+                    daxa_response.request.url,
+                    str(daxa_response.request.body)[:999],
+                    str(
+                        len(
+                            daxa_response.request.body
+                            if daxa_response.request.body
+                            else []
+                        )
+                    ),
+                    str(daxa_response.status_code),
+                    daxa_response.json(),
                 )
             except requests.exceptions.RequestException:
                 logger.warning("Unable to reach Daxa cloud server.")
@@ -292,7 +300,7 @@ class PebbloSafeLoader(BaseLoader):
                     url {resp.request.url}, \
                     headers {resp.request.headers}, \
                     body {str(resp.request.body)[:999]} \
-                    len {len(resp.request.body if resp.request.body  else [])} \
+                    len {len(resp.request.body if resp.request.body else [])} \
                     response status{resp.status_code} body {resp.json()}"
             )
             if resp.status_code in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
@@ -374,11 +382,15 @@ class PebbloSafeLoader(BaseLoader):
         Returns:
             List[IndexedDocument]: A list of IndexedDocument objects with unique IDs.
         """
-        docs_with_id = [IndexedDocument(id=hex(i)[2:], **doc.dict())
-                        for i, doc in enumerate(self.docs)]
+        docs_with_id = [
+            IndexedDocument(id=hex(i)[2:], **doc.dict())
+            for i, doc in enumerate(self.docs)
+        ]
         return docs_with_id
 
-    def _add_semantic_metadata(self, docs_with_id: List[IndexedDocument], classified_docs: List[dict]) -> List[Document]:
+    def _add_semantic_metadata(
+        self, docs_with_id: List[IndexedDocument], classified_docs: List[dict]
+    ) -> List[Document]:
         """
         Adds semantic metadata to the given list of documents.
 
@@ -394,13 +406,17 @@ class PebbloSafeLoader(BaseLoader):
         indexed_docs = {
             doc.id: Document(page_content=doc.page_content, metadata=doc.metadata)
             for doc in docs_with_id
-            }
+        }
 
         for classified_doc in classified_docs:
             doc_id = classified_doc.get("id")
             if doc_id in indexed_docs:
-                indexed_docs[doc_id].metadata["entities"] = classified_doc.get("entities", [])
-                indexed_docs[doc_id].metadata["topics"] = classified_doc.get("topics", [])
+                indexed_docs[doc_id].metadata["pebblo_semantic_entities"] = (
+                    classified_doc.get("entities", [])
+                )
+                indexed_docs[doc_id].metadata["pebblo_semantic_topics"] = (
+                    classified_doc.get("topics", [])
+                )
 
         semantic_metadata_docs = [doc for doc in indexed_docs.values()]
 
@@ -416,6 +432,8 @@ class PebbloSafeLoader(BaseLoader):
         Returns:
             List[Document]: A list of Document objects.
         """
-        docs = [Document(page_content=doc.page_content, metadata=doc.metadata)
-                for i, doc in enumerate(docs_with_id)]
+        docs = [
+            Document(page_content=doc.page_content, metadata=doc.metadata)
+            for i, doc in enumerate(docs_with_id)
+        ]
         return docs
