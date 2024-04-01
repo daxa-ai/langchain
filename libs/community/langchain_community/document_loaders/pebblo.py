@@ -397,8 +397,8 @@ class PebbloSafeLoader(BaseLoader):
         for classified_doc in classified_docs:
             doc_id = classified_doc.get("id")
             if doc_id in indexed_docs:
-                indexed_docs[doc_id].metadata["entities"] = classified_doc.get("entities", [])
-                indexed_docs[doc_id].metadata["topics"] = classified_doc.get("topics", [])
+                indexed_docs[doc_id].metadata["pebblo_semantic_entities"] = classified_doc.get("entities", [])
+                indexed_docs[doc_id].metadata["pebblo_semantic_topics"] = classified_doc.get("topics", [])
 
         semantic_metadata_docs = [doc for doc in indexed_docs.values()]
 
