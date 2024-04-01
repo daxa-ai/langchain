@@ -42,12 +42,14 @@ class PebbloSafeLoader(BaseLoader):
         owner: str = "",
         description: str = "",
         api_key: Optional[str] = None,
+
         load_semantic: Optional[bool] = False,
 
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
         self.app_name = name
+
         self.api_key = os.environ.get("DAXA_API_KEY") or api_key
         self.load_id = str(uuid.uuid4())
         self.loader = langchain_loader
@@ -147,12 +149,16 @@ class PebbloSafeLoader(BaseLoader):
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
+
         if loading_end is True:
             PebbloSafeLoader.set_loader_sent()
         doc_content = [doc.dict() for doc in loaded_docs]
+
         docs = []
         for doc in doc_content:
-            doc_source_path = get_full_path(doc.get("metadata", {}).get("source"))
+            doc_source_path = get_full_path(
+                doc.get("metadata", {}).get("source", self.source_path)
+            )
             doc_source_owner = PebbloSafeLoader.get_file_owner_from_path(
                 doc_source_path
             )
@@ -246,6 +252,10 @@ class PebbloSafeLoader(BaseLoader):
                 logger.warning("Unable to reach Daxa cloud server.")
             except Exception as e:
                 logger.warning("An Exception caught in _send_loader_doc: %s", e)
+
+
+        if loading_end is True:
+            PebbloSafeLoader.set_loader_sent()
 
         return classified_docs
 
