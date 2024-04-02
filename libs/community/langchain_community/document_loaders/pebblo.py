@@ -90,6 +90,9 @@ class PebbloSafeLoader(BaseLoader):
             return self.docs
         self.docs_with_id = self._index_docs()
         classified_docs = self._classify_doc(self.docs_with_id, loading_end=True)
+        if not classified_docs:
+            logger.warning("No classified docs recieved from pebblo-server.")
+            return self.docs
         self.docs_with_id = self._add_semantic_metadata(self.docs_with_id, classified_docs)
         self.docs = self._unindex_docs(self.docs_with_id)
         return self.docs
@@ -198,10 +201,12 @@ class PebbloSafeLoader(BaseLoader):
                     self.source_aggregate_size
         payload = Doc(**payload).dict(exclude_unset=True)
         load_doc_url = f"{CLASSIFIER_URL}/v1/loader/doc"
+        classified_docs = []
         try:
             pebblo_resp = requests.post(
                 load_doc_url, headers=headers, json=payload, timeout=300
             )
+            classified_docs=json.loads(pebblo_resp.text).get('docs', None)
             if pebblo_resp.status_code not in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
                 logger.warning(
                     "Received unexpected HTTP response code: %s",
@@ -220,10 +225,6 @@ class PebbloSafeLoader(BaseLoader):
             logger.warning("Unable to reach pebblo server.")
         except Exception as e:
             logger.warning("An Exception caught in _send_loader_doc: %s", e)
-        finally:
-            classified_docs=json.loads(pebblo_resp.text).get('docs', None)
-            if not isinstance(classified_docs, list):
-                classified_docs = None
 
         if self.api_key:
             try:
@@ -407,8 +408,8 @@ class PebbloSafeLoader(BaseLoader):
         for classified_doc in classified_docs:
             doc_id = classified_doc.get("id")
             if doc_id in indexed_docs:
-                indexed_docs[doc_id].metadata["pebblo_semantic_entities"] = classified_doc.get("entities", [])
-                indexed_docs[doc_id].metadata["pebblo_semantic_topics"] = classified_doc.get("topics", [])
+                indexed_docs[doc_id].metadata["pebblo_semantic_entities"] = list(classified_doc.get("entities", {}).keys())
+                indexed_docs[doc_id].metadata["pebblo_semantic_topics"] = list(classified_doc.get("topics", {}).keys())
 
         semantic_metadata_docs = [doc for doc in indexed_docs.values()]
 
