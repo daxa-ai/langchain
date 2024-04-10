@@ -159,6 +159,9 @@ class PebbloSafeLoader(BaseLoader):
 
         docs = []
         for doc in doc_content:
+            doc_authorized_identities = doc.get("metadata", {}).get(
+                "authorized_identities", []
+            )
             doc_source_path = get_full_path(
                 doc.get("metadata", {}).get("source", self.source_path)
             )
@@ -177,6 +180,11 @@ class PebbloSafeLoader(BaseLoader):
                     "id": doc_id,
                     "last_modified": doc.get("metadata", {}).get("last_modified"),
                     "file_owner": doc_source_owner,
+                    **(
+                        {"authorized_identities": doc_authorized_identities}
+                        if doc_authorized_identities
+                        else {}
+                    ),
                     **(
                         {"source_path_size": doc_source_size}
                         if doc_source_size is not None
