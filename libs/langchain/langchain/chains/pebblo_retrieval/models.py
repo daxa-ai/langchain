@@ -117,3 +117,17 @@ class Qa(BaseModel):
     prompt_time: str
     user: str
 
+
+class ChainInput(BaseModel):
+    """Input for PebbloRetrievalQA chain."""
+
+    query: str
+    auth_context: Optional[AuthContext] = None
+    semantic_context: Optional[SemanticContext] = None
+
+    def dict(self, **kwargs: Any) -> dict:
+        base_dict = super().dict(**kwargs)
+        # Keep auth_context and semantic_context as it is(Pydantic models)
+        base_dict["auth_context"] = self.auth_context
+        base_dict["semantic_context"] = self.semantic_context
+        return base_dict

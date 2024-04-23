@@ -15,7 +15,11 @@ from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
 
 from langchain.chains.pebblo_retrieval.base import PebbloRetrievalQA
-from langchain.chains.pebblo_retrieval.models import AuthContext, SemanticContext
+from langchain.chains.pebblo_retrieval.models import (
+    AuthContext,
+    ChainInput,
+    SemanticContext,
+)
 from tests.unit_tests.llms.fake_llm import FakeLLM
 
 
@@ -86,13 +90,12 @@ def test_invoke(pebblo_retrieval_qa: PebbloRetrievalQA) -> None:
     semantic_context = SemanticContext(**semantic_context_dict)
 
     question = "What is the meaning of life?"
-    response = pebblo_retrieval_qa.invoke(
-        {
-            "query": question,
-            "auth_context": auth_context,
-            "semantic_context": semantic_context,
-        }
+
+
+    chain_input_obj = ChainInput(
+        query=question, auth_context=auth_context, semantic_context=semantic_context
     )
+    response = pebblo_retrieval_qa.invoke(chain_input_obj.dict())
     assert response is not None
 
 

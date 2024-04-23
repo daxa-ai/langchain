@@ -43,6 +43,7 @@ from langchain.chains.question_answering import load_qa_chain
 
 logger = logging.getLogger(__name__)
 
+
 class PebbloRetrievalQA(Chain):
     """
     Retrieval Chain with Identity & Semantic Enforcement for question-answering
@@ -211,6 +212,7 @@ class PebbloRetrievalQA(Chain):
         chain_type: str = "stuff",
         chain_type_kwargs: Optional[dict] = None,
         api_key: Optional[str] = None,
+
         **kwargs: Any,
     ) -> "PebbloRetrievalQA":
         """Load chain from chain type."""
