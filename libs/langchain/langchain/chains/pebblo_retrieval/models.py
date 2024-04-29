@@ -116,6 +116,7 @@ class Qa(BaseModel):
     response: Prompt
     prompt_time: str
     user: str
+    user_identities: Optional[List[str]]
 
 
 class ChainInput(BaseModel):
