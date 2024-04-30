@@ -13,7 +13,7 @@ from langchain_core.callbacks import (
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
 
-from langchain_community.chains.pebblo_retrieval.base import PebbloRetrievalQA
+from langchain_community.chains import PebbloRetrievalQA
 from langchain_community.chains.pebblo_retrieval.models import (
     AuthContext,
     ChainInput,
