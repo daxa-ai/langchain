@@ -107,7 +107,7 @@ class PebbloRetrievalQA(Chain):
             "name": self.app_name,
             "context": [
                 {
-                    "retrieved_from": doc.metadata.get('source'),
+                    "retrieved_from": doc.metadata.get("full_path", doc.metadata.get("source")),
                     "doc": doc.page_content,
                     "vector_db": self.retriever.vectorstore.__class__.__name__,
                     }
