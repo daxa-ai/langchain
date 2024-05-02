@@ -434,11 +434,12 @@ class PebbloRetrievalQA(Chain):
 
     @classmethod
     def get_chain_details(cls, llm, **kwargs):
+        llm_dict = llm.__dict__
         chain = [
             {
                 "name": cls.__name__,
                 "model": {
-                    "name": llm.model_name,
+                    "name": llm_dict.get("model_name", llm_dict.get("model")),
                     "vendor": llm.__class__.__name__
                     },
                 "vector_dbs": [
