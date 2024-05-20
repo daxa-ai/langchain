@@ -384,10 +384,12 @@ class PebbloRetrievalQA(Chain):
             "Content-Type": "application/json",
         }
         prompt_url = f"{CLASSIFIER_URL}{PROMPT_URL}"
+        retrieval_data = {}
         try:
             pebblo_resp = requests.post(
                 prompt_url, headers=headers, json=qa_payload.dict(), timeout=20
                 )
+            retrieval_data = json.loads(pebblo_resp.text)["retrieval_data"]
             print("prompt-payload", qa_payload)
             logger.debug(
                 "send_prompt[local]: request url %s, body %s len %s\
@@ -410,13 +412,14 @@ class PebbloRetrievalQA(Chain):
             logger.warning("An Exception caught in _send_discover: local %s", e)
 
         if self.api_key:
+            if not retrieval_data:
+                retrieval_data
             try:
                 headers.update({"x-api-key": self.api_key})
                 pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}{PROMPT_URL}"
-                payload = json.loads(pebblo_resp.text)["retrieval_data"]
-                payload.update({"classified": qa_payload.classified, "name": self.app_name})
+                retrieval_data.update({"classified": qa_payload.classified, "name": self.app_name})
                 pebblo_cloud_response = requests.post(
-                    pebblo_cloud_url, headers=headers, json=payload, timeout=20
+                    pebblo_cloud_url, headers=headers, json=retrieval_data, timeout=20
                 )
 
                 logger.debug(
