@@ -2,6 +2,7 @@
 Pebblo Retrieval Chain with Identity & Semantic Enforcement for question-answering
 against a vector database.
 """
+import json
 import datetime
 import inspect
 import logging
@@ -68,6 +69,8 @@ class PebbloRetrievalQA(Chain):
     description: str  #: :meta private:
     """Description of app."""
     api_key: Optional[str] = None  #: :meta private:
+    """Falg for classifier"""
+    classified: Optional[bool] = True,  #: :meta private:
 
     def _call(
         self,
@@ -122,6 +125,7 @@ class PebbloRetrievalQA(Chain):
             "prompt_time": prompt_time,
             "user": auth_context.user_id if auth_context else "unknown",
             "user_identities": auth_context.authorized_identities if auth_context else [],
+            "classified": bool(self.classified),
         }
         qa_payload = Qa(**qa)
         self._send_prompt(qa_payload)
@@ -211,6 +215,7 @@ class PebbloRetrievalQA(Chain):
         chain_type: str = "stuff",
         chain_type_kwargs: Optional[dict] = None,
         api_key: Optional[str] = None,
+        classified: Optional[bool] = True,
         **kwargs: Any,
     ) -> "PebbloRetrievalQA":
         """Load chain from chain type."""
@@ -378,10 +383,10 @@ class PebbloRetrievalQA(Chain):
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
-        app_discover_url = f"{CLASSIFIER_URL}{PROMPT_URL}"
+        prompt_url = f"{CLASSIFIER_URL}{PROMPT_URL}"
         try:
             pebblo_resp = requests.post(
-                app_discover_url, headers=headers, json=qa_payload.dict(), timeout=20
+                prompt_url, headers=headers, json=qa_payload.dict(), timeout=20
                 )
             print("prompt-payload", qa_payload)
             logger.debug(
@@ -408,8 +413,10 @@ class PebbloRetrievalQA(Chain):
             try:
                 headers.update({"x-api-key": self.api_key})
                 pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}{PROMPT_URL}"
+                payload = json.loads(pebblo_resp.text)["retrieval_data"]
+                payload.update({"classified": qa_payload.classified, "name": self.app_name})
                 pebblo_cloud_response = requests.post(
-                    pebblo_cloud_url, headers=headers, json=qa_payload.dict(), timeout=20
+                    pebblo_cloud_url, headers=headers, json=payload, timeout=20
                 )
 
                 logger.debug(
