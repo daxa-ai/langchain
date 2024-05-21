@@ -413,7 +413,7 @@ class PebbloRetrievalQA(Chain):
 
         if self.api_key:
             if not retrieval_data:
-                retrieval_data
+                return
             try:
                 headers.update({"x-api-key": self.api_key})
                 pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}{PROMPT_URL}"
