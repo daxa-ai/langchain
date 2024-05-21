@@ -2,6 +2,7 @@
 Pebblo Retrieval Chain with Identity & Semantic Enforcement for question-answering
 against a vector database.
 """
+import json
 import datetime
 import inspect
 import logging
@@ -68,6 +69,8 @@ class PebbloRetrievalQA(Chain):
     description: str  #: :meta private:
     """Description of app."""
     api_key: Optional[str] = None  #: :meta private:
+    """Falg for classifier"""
+    classified: Optional[bool] = True,  #: :meta private:
 
     def _call(
         self,
@@ -122,6 +125,7 @@ class PebbloRetrievalQA(Chain):
             "prompt_time": prompt_time,
             "user": auth_context.user_id if auth_context else "unknown",
             "user_identities": auth_context.authorized_identities if auth_context else [],
+            "classified": bool(self.classified),
         }
         qa_payload = Qa(**qa)
         self._send_prompt(qa_payload)
@@ -211,6 +215,7 @@ class PebbloRetrievalQA(Chain):
         chain_type: str = "stuff",
         chain_type_kwargs: Optional[dict] = None,
         api_key: Optional[str] = None,
+        classified: Optional[bool] = True,
         **kwargs: Any,
     ) -> "PebbloRetrievalQA":
         """Load chain from chain type."""
@@ -378,11 +383,13 @@ class PebbloRetrievalQA(Chain):
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
-        app_discover_url = f"{CLASSIFIER_URL}{PROMPT_URL}"
+        prompt_url = f"{CLASSIFIER_URL}{PROMPT_URL}"
+        retrieval_data = {}
         try:
             pebblo_resp = requests.post(
-                app_discover_url, headers=headers, json=qa_payload.dict(), timeout=20
+                prompt_url, headers=headers, json=qa_payload.dict(), timeout=20
                 )
+            retrieval_data = json.loads(pebblo_resp.text)["retrieval_data"]
             print("prompt-payload", qa_payload)
             logger.debug(
                 "send_prompt[local]: request url %s, body %s len %s\
@@ -405,11 +412,14 @@ class PebbloRetrievalQA(Chain):
             logger.warning("An Exception caught in _send_discover: local %s", e)
 
         if self.api_key:
+            if not retrieval_data:
+                return
             try:
                 headers.update({"x-api-key": self.api_key})
                 pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}{PROMPT_URL}"
+                retrieval_data.update({"classified": qa_payload.classified, "name": self.app_name})
                 pebblo_cloud_response = requests.post(
-                    pebblo_cloud_url, headers=headers, json=qa_payload.dict(), timeout=20
+                    pebblo_cloud_url, headers=headers, json=retrieval_data, timeout=20
                 )
 
                 logger.debug(
