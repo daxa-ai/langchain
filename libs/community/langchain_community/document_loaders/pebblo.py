@@ -327,10 +327,10 @@ class PebbloSafeLoader(BaseLoader):
             try:
                 headers.update({"x-api-key": self.api_key})
                 if pebblo_resp:
-                    pebblo_serer_version = json.loads(pebblo_resp.text).get("pebblo_server_version")
+                    pebblo_server_version = json.loads(pebblo_resp.text).get("pebblo_server_version")
                     payload.update(
                         {
-                            "pebblo_server_version": pebblo_serer_version,
+                            "pebblo_server_version": pebblo_server_version,
                             "pebblo_client_version": payload['plugin_version'],
                         }
                     )
