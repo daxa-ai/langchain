@@ -368,7 +368,7 @@ class PebbloRetrievalQA(Chain):
             except Exception as e:
                 logger.warning("An Exception caught in _send_discover: local %s", e)
 
-        if api_key and classifier_location == "pebblo-cloud":
+        if api_key:
             try:
                 headers.update({"x-api-key": api_key})
                 pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}{APP_DISCOVER_URL}"
