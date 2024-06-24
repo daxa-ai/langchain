@@ -46,7 +46,8 @@ class PebbloSafeLoader(BaseLoader):
         api_key: Optional[str] = None,
         load_semantic: bool = False,
         classifier_url: Optional[str] = None,
-        classifier_location: Optional[str] = None,
+        *,
+        classifier_location: str = "local",
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
@@ -207,6 +208,7 @@ class PebbloSafeLoader(BaseLoader):
             "loader_details": self.loader_details,
             "loading_end": "false",
             "source_owner": self.source_owner,
+            "classifier_location": self.classifier_location,
         }
         if loading_end is True:
             payload["loading_end"] = "true"
@@ -252,7 +254,6 @@ class PebbloSafeLoader(BaseLoader):
         if self.api_key:
             if self.classifier_location == "local":
                 payload["docs"] = classified_docs
-            payload["classifier_location"] = self.classifier_location
             headers.update({"x-api-key": self.api_key})
             pebblo_cloud_url = f"{PEBBLO_CLOUD_URL}{LOADER_DOC_URL}"
             try:
@@ -278,6 +279,9 @@ class PebbloSafeLoader(BaseLoader):
                 logger.warning("Unable to reach Pebblo cloud server.")
             except Exception as e:
                 logger.warning("An Exception caught in _send_loader_doc: cloud %s", e)
+        elif self.classifier_location == "pebblo-cloud":
+            logger.warning("API key is missing for sending docs to Pebblo cloud.")
+            raise NameError("API key is missing for sending docs to Pebblo cloud.")
 
         return classified_docs
 
