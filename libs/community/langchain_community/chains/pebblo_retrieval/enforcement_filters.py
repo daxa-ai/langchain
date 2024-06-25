@@ -21,11 +21,14 @@ from langchain_community.chains.pebblo_retrieval.models import (
     AuthContext,
     SemanticContext,
 )
-from langchain_community.vectorstores import Pinecone, Qdrant
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_VECTORSTORES = [Pinecone, Qdrant]
+PINECONE = "Pinecone"
+QDRANT = "Qdrant"
+PGVECTOR = "PGVector"
+
+SUPPORTED_VECTORSTORES = {PINECONE, QDRANT, PGVECTOR}
 
 
 def set_enforcement_filters(
@@ -243,9 +246,9 @@ def _set_identity_enforcement_filter(
     of the retriever based on the type of the vectorstore.
     """
     search_kwargs = retriever.search_kwargs
-    if isinstance(retriever.vectorstore, Pinecone):
+    if retriever.vectorstore.__class__.__name__ == PINECONE:
         _apply_pinecone_authorization_filter(search_kwargs, auth_context)
-    elif isinstance(retriever.vectorstore, Qdrant):
+    elif retriever.vectorstore.__class__.__name__ == QDRANT:
         _apply_qdrant_authorization_filter(search_kwargs, auth_context)
 
 
@@ -259,7 +262,7 @@ def _set_semantic_enforcement_filter(
     of the retriever based on the type of the vectorstore.
     """
     search_kwargs = retriever.search_kwargs
-    if isinstance(retriever.vectorstore, Pinecone):
+    if retriever.vectorstore.__class__.__name__ == PINECONE:
         _apply_pinecone_semantic_filter(search_kwargs, semantic_context)
-    elif isinstance(retriever.vectorstore, Qdrant):
+    elif retriever.vectorstore.__class__.__name__ == QDRANT:
         _apply_qdrant_semantic_filter(search_kwargs, semantic_context)
