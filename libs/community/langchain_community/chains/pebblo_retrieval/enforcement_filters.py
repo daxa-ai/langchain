@@ -265,9 +265,57 @@ def _apply_pgvector_authorization_filter(
     Set identity enforcement filter in search_kwargs for PGVector vectorstore.
     """
     if auth_context is not None:
-        search_kwargs.setdefault("filter", {})["authorized_identities"] = {
-            "$eq": auth_context.user_auth
-        }
+        auth_filter = {"authorized_identities": {"$eq": auth_context.user_auth}}
+        filters = search_kwargs.get("filter")
+        if isinstance(filters, dict):
+            if len(filters) == 1:
+                # The only operators allowed at the top level are $AND, $OR, and $NOT
+                # First check if an operator or a field
+                key, value = list(filters.items())[0]
+                if key.startswith("$"):
+                    # Then it's an operator
+                    if key.lower() not in ["$and", "$or", "$not"]:
+                        raise ValueError(
+                            f"Invalid filter condition. Expected $and, $or or $not "
+                            f"but got: {key}"
+                        )
+                else:
+                    # Then it's a field
+                    filters.update(auth_filter)
+                    return
+
+                # Here we handle the $and, $or, and $not operators
+                if not isinstance(value, list):
+                    raise ValueError(
+                        f"Expected a list, but got {type(value)} for value: {value}"
+                    )
+                if key.lower() == "$and":
+                    value.append(auth_filter)
+                elif key.lower() == "$or" or key.lower() == "$not":
+                    search_kwargs["filter"] = {"$and": [filters, auth_filter]}
+                else:
+                    raise ValueError(
+                        f"Invalid filter condition. Expected $and, $or or $not "
+                        f"but got: {key}"
+                    )
+            elif len(filters) > 1:
+                # Then all keys have to be fields (they cannot be operators)
+                for key in filters.keys():
+                    if key.startswith("$"):
+                        raise ValueError(
+                            f"Invalid filter condition. Expected a field but got: {key}"
+                        )
+                # filters should all be fields and we can add an extra field to it
+                filters.update(auth_filter)
+            else:
+                # Got an empty dictionary for filters, update auth filter in filter
+                search_kwargs.setdefault("filter", {}).update(auth_filter)
+        elif filters is None:
+            search_kwargs.setdefault("filter", {}).update(auth_filter)
+        else:
+            raise ValueError(
+                f"Invalid type: Expected a dictionary but got type: {type(filters)}"
+            )
 
 
 def _set_identity_enforcement_filter(
