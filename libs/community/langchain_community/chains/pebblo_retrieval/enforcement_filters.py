@@ -31,6 +31,23 @@ PGVECTOR = "PGVector"
 SUPPORTED_VECTORSTORES = {PINECONE, QDRANT, PGVECTOR}
 
 
+def clear_enforcement_filters(retriever):
+    """
+    Clear the identity and semantic enforcement filters in the retriever.
+    """
+    if retriever.vectorstore.__class__.__name__ == PGVECTOR:
+        search_kwargs = retriever.search_kwargs
+        if "filter" in search_kwargs:
+            filters = search_kwargs["filter"]
+            _clear_prev_pgvector_filter(
+                search_kwargs, filters, "pebblo_semantic_topics"
+            )
+            _clear_prev_pgvector_filter(
+                search_kwargs, filters, "pebblo_semantic_entities"
+            )
+            _clear_prev_pgvector_filter(search_kwargs, filters, "authorized_identities")
+
+
 def set_enforcement_filters(
     retriever: VectorStoreRetriever,
     auth_context: Optional[AuthContext],
@@ -39,6 +56,8 @@ def set_enforcement_filters(
     """
     Set identity and semantic enforcement filters in the retriever.
     """
+    # Clear previous enforcement filters
+    clear_enforcement_filters(retriever)
     if auth_context is not None:
         _set_identity_enforcement_filter(retriever, auth_context)
     if semantic_context is not None:
@@ -286,6 +305,61 @@ def _apply_pgvector_filter(search_kwargs, filters, pebblo_filter):
     elif filters is None:
         # If filters is None, set pebblo_filter as a new filter
         search_kwargs.setdefault("filter", {}).update(pebblo_filter)
+    else:
+        raise ValueError(
+            f"Invalid filter. Expected a dictionary/None but got type: {type(filters)}"
+        )
+
+
+def _clear_prev_pgvector_filter(search_kwargs, filters, pebblo_filter_key):
+    """
+    Remove pebblo filters from the search_kwargs filters.
+    """
+    if isinstance(filters, dict):
+        if len(filters) == 1:
+            # The only operators allowed at the top level are $AND, $OR, and $NOT
+            # First check if an operator or a field
+            key, value = list(filters.items())[0]
+            if key.startswith("$"):
+                # Then it's an operator
+                if key.lower() not in ["$and", "$or", "$not"]:
+                    raise ValueError(
+                        f"Invalid filter condition. Expected $and, $or or $not "
+                        f"but got: {key}"
+                    )
+            else:
+                # Then it's a field
+                if key == pebblo_filter_key:
+                    filters.pop(key)
+                return
+
+            # Here we handle the $and, $or, and $not operators
+            if not isinstance(value, list):
+                raise ValueError(
+                    f"Expected a list, but got {type(value)} for value: {value}"
+                )
+            if key.lower() == "$and":
+                # Remove the pebblo filter from the $and list
+                for i, filter in enumerate(value):
+                    if pebblo_filter_key in filter:
+                        value.pop(i)
+                        break
+                if len(value) == 1:
+                    # If only one filter is left, then remove the $and operator
+                    search_kwargs["filter"] = value[0]
+            else:
+                # If $or or $not, then ignore the filter
+                pass
+        elif len(filters) > 1:
+            # Then all keys have to be fields (they cannot be operators)
+            if pebblo_filter_key in filters:
+                filters.pop(pebblo_filter_key)
+        else:
+            # Got an empty dictionary for filters, ignore the filter
+            pass
+    elif filters is None:
+        # If filters is None, ignore the filter
+        pass
     else:
         raise ValueError(
             f"Invalid filter. Expected a dictionary/None but got type: {type(filters)}"
