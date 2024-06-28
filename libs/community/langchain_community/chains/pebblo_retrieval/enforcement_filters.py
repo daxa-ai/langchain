@@ -13,7 +13,7 @@ The methods in this module are designed to work with different types of vector s
 """
 
 import logging
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from langchain_core.vectorstores import VectorStoreRetriever
 
@@ -31,7 +31,7 @@ PGVECTOR = "PGVector"
 SUPPORTED_VECTORSTORES = {PINECONE, QDRANT, PGVECTOR}
 
 
-def clear_enforcement_filters(retriever):
+def clear_enforcement_filters(retriever: VectorStoreRetriever) -> None:
     """
     Clear the identity and semantic enforcement filters in the retriever.
     """
@@ -255,7 +255,9 @@ def _apply_pinecone_authorization_filter(
         }
 
 
-def _apply_pgvector_filter(search_kwargs, filters, pebblo_filter):
+def _apply_pgvector_filter(
+    search_kwargs: dict, filters: Optional[Any], pebblo_filter: dict
+) -> None:
     """
     Apply pebblo filters in the search_kwargs filters.
     """
@@ -311,7 +313,9 @@ def _apply_pgvector_filter(search_kwargs, filters, pebblo_filter):
         )
 
 
-def _clear_prev_pgvector_filter(search_kwargs, filters, pebblo_filter_key):
+def _clear_prev_pgvector_filter(
+    search_kwargs: dict, filters: dict, pebblo_filter_key: str
+) -> None:
     """
     Remove pebblo filters from the search_kwargs filters.
     """
@@ -377,7 +381,7 @@ def _apply_pgvector_semantic_filter(
         filters = search_kwargs.get("filter")
         if semantic_context.pebblo_semantic_topics is not None:
             # Add pebblo_semantic_topics filter to search_kwargs
-            topic_filter = {
+            topic_filter: dict = {
                 "pebblo_semantic_topics": {
                     "$ne": semantic_context.pebblo_semantic_topics.deny
                 }
@@ -386,7 +390,7 @@ def _apply_pgvector_semantic_filter(
 
         if semantic_context.pebblo_semantic_entities is not None:
             # Add pebblo_semantic_entities filter to search_kwargs
-            entity_filter = {
+            entity_filter: dict = {
                 "pebblo_semantic_entities": {
                     "$ne": semantic_context.pebblo_semantic_entities.deny
                 }
@@ -401,7 +405,7 @@ def _apply_pgvector_authorization_filter(
     Set identity enforcement filter in search_kwargs for PGVector vectorstore.
     """
     if auth_context is not None:
-        auth_filter = {"authorized_identities": {"$eq": auth_context.user_auth}}
+        auth_filter: dict = {"authorized_identities": {"$eq": auth_context.user_auth}}
         filters = search_kwargs.get("filter")
         _apply_pgvector_filter(search_kwargs, filters, auth_filter)
 
