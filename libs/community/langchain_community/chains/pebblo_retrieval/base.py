@@ -80,7 +80,7 @@ class PebbloRetrievalQA(Chain):
     """Flag to check if discover payload has been sent."""
     _prompt_sent: bool = False  #: :meta private:
     """Flag to check if prompt payload has been sent."""
-    _prompt_gov_sent: bool = False  #: :meta private:
+    _enable_prompt_gov: bool = True  #: :meta private:
     """Flag to check if prompt governance payload has been sent."""
 
     def _call(
@@ -106,13 +106,21 @@ class PebbloRetrievalQA(Chain):
 
         auth_context = inputs.get(self.auth_context_key, {})
         semantic_context = inputs.get(self.semantic_context_key, {})
-        is_valid_prompt = self._check_prompt_validity(question, semantic_context)
-        logger.info(f"is_valid_prompt {is_valid_prompt}")
-        if is_valid_prompt is False:
-            return {
-                self.output_key: """Your prompt has some sensitive information.  
-                    Remove the senstitive information and try again !!!"""
-            }
+        
+        if (
+            self._enable_prompt_gov
+            and semantic_context is not None
+            and semantic_context.pebblo_semantic_entities is not None
+            and semantic_context.pebblo_semantic_entities.deny is not None
+            and len(semantic_context.pebblo_semantic_entities.deny) > 0
+        ):
+            is_valid_prompt = self._check_prompt_validity(question, semantic_context)
+            logger.info(f"is_valid_prompt {is_valid_prompt}")
+            if is_valid_prompt is False:
+                return {
+                    self.output_key: """Your prompt has some sensitive information.  
+                        Remove the senstitive information and try again !!!"""
+                }
 
         _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
         accepts_run_manager = (
