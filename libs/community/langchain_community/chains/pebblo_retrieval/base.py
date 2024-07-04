@@ -190,6 +190,20 @@ class PebbloRetrievalQA(Chain):
         accepts_run_manager = (
             "run_manager" in inspect.signature(self._aget_docs).parameters
         )
+        if (
+            self._enable_prompt_gov
+            and semantic_context is not None
+            and semantic_context.pebblo_semantic_entities is not None
+            and semantic_context.pebblo_semantic_entities.deny is not None
+            and len(semantic_context.pebblo_semantic_entities.deny) > 0
+        ):
+            is_valid_prompt = self._check_prompt_validity(question, semantic_context)
+            logger.info(f"is_valid_prompt {is_valid_prompt}")
+            if is_valid_prompt is False:
+                return {
+                    self.output_key: """Your prompt has some sensitive information.  
+                        Remove the senstitive information and try again !!!"""
+                }
         if accepts_run_manager:
             docs = await self._aget_docs(
                 question, auth_context, semantic_context, run_manager=_run_manager
