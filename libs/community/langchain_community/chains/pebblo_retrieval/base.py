@@ -101,7 +101,6 @@ class PebbloRetrievalQA(Chain):
         """
         prompt_time = datetime.datetime.now().isoformat()
         PebbloRetrievalQA.set_prompt_sent(value=False)
-        PebbloRetrievalQA.set_prompt_gov_sent(value=False)
         question = inputs[self.input_key]
 
         auth_context = inputs.get(self.auth_context_key, {})
@@ -434,10 +433,6 @@ class PebbloRetrievalQA(Chain):
     def set_prompt_sent(cls, value: bool = True) -> None:
         cls._prompt_sent = value
 
-    @classmethod
-    def set_prompt_gov_sent(cls, value: bool = True) -> None:
-        cls._prompt_gov_sent = value
-
     def _send_prompt(self, qa_payload: Qa) -> None:
         headers = {
             "Accept": "application/json",
@@ -590,13 +585,6 @@ class PebbloRetrievalQA(Chain):
                     pebblo_resp.json(),
                 )
                 logger.info(f"pebblo_resp.json() {pebblo_resp.json()}")
-                if pebblo_resp.status_code in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
-                    PebbloRetrievalQA.set_prompt_gov_sent()
-                else:
-                    logger.warning(
-                        "Received unexpected HTTP response code:"
-                        + f"{pebblo_resp.status_code}"
-                    )
 
                 deny_list = semantic_context.pebblo_semantic_entities.deny
                 prompt_entities = pebblo_resp.json().get("entities")
