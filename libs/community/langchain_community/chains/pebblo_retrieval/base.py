@@ -37,6 +37,7 @@ from langchain_community.chains.pebblo_retrieval.utilities import (
     CLASSIFIER_URL,
     PEBBLO_CLOUD_URL,
     PLUGIN_VERSION,
+    PROMPT_GOV_URL,
     PROMPT_URL,
     get_runtime,
 )
@@ -79,6 +80,8 @@ class PebbloRetrievalQA(Chain):
     """Flag to check if discover payload has been sent."""
     _prompt_sent: bool = False  #: :meta private:
     """Flag to check if prompt payload has been sent."""
+    _prompt_gov_sent: bool = False  #: :meta private:
+    """Flag to check if prompt governance payload has been sent."""
 
     def _call(
         self,
@@ -98,10 +101,20 @@ class PebbloRetrievalQA(Chain):
         """
         prompt_time = datetime.datetime.now().isoformat()
         PebbloRetrievalQA.set_prompt_sent(value=False)
-        _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
+        PebbloRetrievalQA.set_prompt_gov_sent(value=False)
         question = inputs[self.input_key]
+
         auth_context = inputs.get(self.auth_context_key, {})
         semantic_context = inputs.get(self.semantic_context_key, {})
+        is_valid_prompt = self._check_prompt_validity(question, semantic_context)
+        logger.info(f"is_valid_prompt {is_valid_prompt}")
+        if is_valid_prompt is False:
+            return {
+                self.output_key: """Your prompt has some sensitive information.  
+                    Remove the senstitive information and try again !!!"""
+            }
+
+        _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
         accepts_run_manager = (
             "run_manager" in inspect.signature(self._get_docs).parameters
         )
@@ -413,6 +426,10 @@ class PebbloRetrievalQA(Chain):
     def set_prompt_sent(cls, value: bool = True) -> None:
         cls._prompt_sent = value
 
+    @classmethod
+    def set_prompt_gov_sent(cls, value: bool = True) -> None:
+        cls._prompt_gov_sent = value
+
     def _send_prompt(self, qa_payload: Qa) -> None:
         headers = {
             "Accept": "application/json",
@@ -443,6 +460,7 @@ class PebbloRetrievalQA(Chain):
                     str(pebblo_resp.status_code),
                     pebblo_resp.json(),
                 )
+                logger.info(f"pebblo_resp.json() {pebblo_resp.json()}")
                 if pebblo_resp.status_code in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
                     PebbloRetrievalQA.set_prompt_sent()
                 else:
@@ -511,6 +529,80 @@ class PebbloRetrievalQA(Chain):
         elif self.classifier_location == "pebblo-cloud":
             logger.warning("API key is missing for sending prompt to Pebblo cloud.")
             raise NameError("API key is missing for sending prompt to Pebblo cloud.")
+
+    def _check_prompt_validity(
+        self, question: str, semantic_context: SemanticContext
+    ) -> bool:
+        """
+        Check the validity of the given prompt using a remote classification service.
+
+        This method sends a prompt to a remote classifier service to determine if it
+        contains any entities that are on a deny list,
+        as specified in the semantic context.
+
+        Args:
+            question (str): The prompt question to be validated.
+            semantic_context (SemanticContext): The semantic context
+            containing deny list entities.
+
+        Returns:
+            bool: True if the prompt is valid (does not contain deny list entities),
+            False otherwise.
+        """
+
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        prompt_payload = {"prompt": question}
+        is_valid_prompt = True
+        prompt_gov_api_url = f"{self.classifier_url}{PROMPT_GOV_URL}"
+        pebblo_resp = None
+        if self.classifier_location == "local":
+            try:
+                pebblo_resp = requests.post(
+                    prompt_gov_api_url,
+                    headers=headers,
+                    json=prompt_payload,
+                    timeout=20,
+                )
+
+                logger.debug("prompt-payload: %s", prompt_payload)
+                logger.debug(
+                    "send_prompt[local]: request url %s, body %s len %s\
+                        response status %s body %s",
+                    pebblo_resp.request.url,
+                    str(pebblo_resp.request.body),
+                    str(
+                        len(
+                            pebblo_resp.request.body if pebblo_resp.request.body else []
+                        )
+                    ),
+                    str(pebblo_resp.status_code),
+                    pebblo_resp.json(),
+                )
+                logger.info(f"pebblo_resp.json() {pebblo_resp.json()}")
+                if pebblo_resp.status_code in [HTTPStatus.OK, HTTPStatus.BAD_GATEWAY]:
+                    PebbloRetrievalQA.set_prompt_gov_sent()
+                else:
+                    logger.warning(
+                        "Received unexpected HTTP response code:"
+                        + f"{pebblo_resp.status_code}"
+                    )
+
+                deny_list = semantic_context.pebblo_semantic_entities.deny
+                prompt_entities = pebblo_resp.json().get("entities")
+                if prompt_entities is not None:
+                    for value in deny_list:
+                        if value in prompt_entities:
+                            is_valid_prompt = False
+                            break
+
+            except requests.exceptions.RequestException:
+                logger.warning("Unable to reach pebblo server.")
+            except Exception as e:
+                logger.warning("An Exception caught in _send_discover: local %s", e)
+        return is_valid_prompt
 
     @classmethod
     def get_chain_details(cls, llm: BaseLanguageModel, **kwargs):  # type: ignore
