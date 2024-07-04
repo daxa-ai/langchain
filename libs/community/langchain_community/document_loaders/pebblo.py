@@ -90,7 +90,6 @@ class PebbloSafeLoader(BaseLoader):
         """
         self.docs = self.loader.load()
         self.docs_with_id = self._index_docs()
-<<<<<<< HEAD
         classified_docs = self._classify_doc(loading_end=True)
         self._add_pebblo_specific_metadata(classified_docs)
         if self.load_semantic:
@@ -98,16 +97,6 @@ class PebbloSafeLoader(BaseLoader):
         else:
             self.docs = self._unindex_docs()  # type: ignore
         return self.docs
-=======
-        classified_docs = self._classify_doc(self.docs_with_id, loading_end=True)
-        self._add_pebblo_specific_metadata(classified_docs)
-        if self.load_semantic:
-            self.docs_with_id = self._add_semantic_to_docs(
-                self.docs_with_id, classified_docs
-            )
-            self.docs = self._unindex_docs(self.docs_with_id)  # type: ignore
-        return self.docs_with_id
->>>>>>> 13b963763 (Replaced id in indexing with pb_id)
 
     def lazy_load(self) -> Iterator[Document]:
         """Load documents in lazy fashion.
@@ -491,17 +480,10 @@ class PebbloSafeLoader(BaseLoader):
         """
         indexed_docs = {
             doc.pb_id: Document(page_content=doc.page_content, metadata=doc.metadata)
-<<<<<<< HEAD
             for doc in self.docs_with_id
         }
 
         for classified_doc in classified_docs.values():
-=======
-            for doc in docs_with_id
-        }
-
-        for classified_doc in classified_docs:
->>>>>>> 13b963763 (Replaced id in indexing with pb_id)
             doc_id = classified_doc.get("pb_id")
             if doc_id in indexed_docs:
                 self._add_semantic_to_doc(indexed_docs[doc_id], classified_doc)
@@ -542,28 +524,17 @@ class PebbloSafeLoader(BaseLoader):
         )
         return doc
 
-<<<<<<< HEAD
-    def _add_pebblo_specific_metadata(self, classified_docs: dict) -> None:
-        """Add Pebblo specific metadata to documents."""
-        for doc in self.docs_with_id:
-            doc_metadata = doc.metadata
-            doc_metadata["full_path"] = get_full_path(
-                doc_metadata.get(
-                    "full_path", doc_metadata.get("source", self.source_path)
-                )
+def _add_pebblo_specific_metadata(self, classified_docs: dict) -> None:
+    """Add Pebblo specific metadata to documents."""
+    for doc in self.docs_with_id:
+        doc_metadata = doc.metadata
+        doc_metadata["full_path"] = get_full_path(
+            doc_metadata.get(
+                "full_path", doc_metadata.get("source", self.source_path)
             )
-            doc_metadata["pb_id"] = doc.pb_id
-            doc_metadata["content_checksum"] = classified_docs.get(doc.pb_id, {}).get(
-                "content_checksum", None
-            )
-=======
-    def _add_pebblo_specific_metadata(self, classified_docs) -> None:
-        """Add Pebblo specific metadata to documents."""
-        for doc in self.docs_with_id:
-            doc_metadata = doc.metadata
-            doc_metadata["pb_id"] = doc.pb_id
-            for doc_data in classified_docs:
-                if doc_data["pb_id"] == doc_metadata["pb_id"]:
-                    doc_metadata["content_checksum"] = doc_data["content_checksum"]
-                    break
->>>>>>> 13b963763 (Replaced id in indexing with pb_id)
+        )
+        doc_metadata["pb_id"] = doc.pb_id
+        doc_metadata["content_checksum"] = classified_docs.get(doc.pb_id, {}).get(
+            "content_checksum", None
+        )
+

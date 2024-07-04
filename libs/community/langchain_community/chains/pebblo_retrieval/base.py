@@ -122,7 +122,7 @@ class PebbloRetrievalQA(Chain):
                     "retrieved_from": doc.metadata.get(
                         "full_path", doc.metadata.get("source")
                     ),
-                    "content_checksum": doc.metadata.get("content_checksum"),
+                    "doc": doc.page_content,
                     "vector_db": self.retriever.vectorstore.__class__.__name__,
                     **(
                         {"content_checksum": doc.metadata.get("content_checksum")}
