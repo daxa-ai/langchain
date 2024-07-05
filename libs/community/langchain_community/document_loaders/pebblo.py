@@ -537,4 +537,3 @@ def _add_pebblo_specific_metadata(self, classified_docs: dict) -> None:
         doc_metadata["content_checksum"] = classified_docs.get(doc.pb_id, {}).get(
             "content_checksum", None
         )
-
