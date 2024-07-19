@@ -8,9 +8,9 @@ from http import HTTPStatus
 from typing import Any, Dict, Iterator, List, Optional, Union
 
 import requests  # type: ignore
-import langchain_community
 from langchain_core.documents import Document
 
+import langchain_community
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_community.utilities.pebblo import (
     APP_DISCOVER_URL,
