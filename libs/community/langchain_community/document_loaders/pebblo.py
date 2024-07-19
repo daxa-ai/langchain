@@ -8,6 +8,7 @@ from http import HTTPStatus
 from typing import Any, Dict, Iterator, List, Optional, Union
 
 import requests  # type: ignore
+import langchain_community
 from langchain_core.documents import Document
 
 from langchain_community.document_loaders.base import BaseLoader
@@ -399,6 +400,7 @@ class PebbloSafeLoader(BaseLoader):
             runtime=runtime,
             framework=framework,
             plugin_version=PLUGIN_VERSION,
+            langchain_version=langchain_community.__version__,
         )
         return app
 
