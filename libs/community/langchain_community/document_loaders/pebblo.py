@@ -49,7 +49,7 @@ class PebbloSafeLoader(BaseLoader):
         classifier_url: Optional[str] = None,
         *,
         classifier_location: str = "local",
-        **kwargs,
+        **kwargs: Optional[dict],
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
