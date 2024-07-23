@@ -184,7 +184,7 @@ def get_loader_type(loader: str) -> str:
     return "unsupported"
 
 
-def get_loader_full_path(loader: BaseLoader) -> str:
+def get_loader_full_path(loader: BaseLoader, **kwargs) -> str:
     """Return an absolute source path of source of loader based on the
     keys present in Document.
 
@@ -196,6 +196,7 @@ def get_loader_full_path(loader: BaseLoader) -> str:
         GCSFileLoader,
         NotionDBLoader,
         S3FileLoader,
+        SharePointLoader,
     )
 
     location = "-"
@@ -230,6 +231,9 @@ def get_loader_full_path(loader: BaseLoader) -> str:
             location = "in-memory"
         elif isinstance(loader, NotionDBLoader):
             location = f"notiondb://{loader.database_id}"
+        elif isinstance(loader, SharePointLoader):
+            if loader.folder_path:
+                location = kwargs.get("folder_url")
         elif loader.__class__.__name__ == "GoogleDriveLoader":
             if loader_dict.get("folder_id"):
                 folder_id = loader_dict.get("folder_id")

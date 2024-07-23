@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterator, List, Optional
 import requests  # type: ignore
 from langchain_core.documents import Document
 
+from langchain_community.document_loaders import SharePointLoader
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_community.utilities.pebblo import (
     APP_DISCOVER_URL,
@@ -48,6 +49,7 @@ class PebbloSafeLoader(BaseLoader):
         classifier_url: Optional[str] = None,
         *,
         classifier_location: str = "local",
+        **kwargs,
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
@@ -58,7 +60,7 @@ class PebbloSafeLoader(BaseLoader):
         self.load_semantic = os.environ.get("PEBBLO_LOAD_SEMANTIC") or load_semantic
         self.owner = owner
         self.description = description
-        self.source_path = get_loader_full_path(self.loader)
+        self.source_path = get_loader_full_path(self.loader, **kwargs)
         self.source_owner = PebbloSafeLoader.get_file_owner_from_path(self.source_path)
         self.docs: List[Document] = []
         self.docs_with_id: List[IndexedDocument] = []
@@ -158,11 +160,16 @@ class PebbloSafeLoader(BaseLoader):
         for doc in doc_content:
             doc_metadata = doc.get("metadata", {})
             doc_authorized_identities = doc_metadata.get("authorized_identities", [])
-            doc_source_path = get_full_path(
-                doc_metadata.get(
-                    "full_path", doc_metadata.get("source", self.source_path)
+            if isinstance(self.loader, SharePointLoader):
+                doc_source_path = get_full_path(
+                    doc_metadata.get("source", self.source_path)
                 )
-            )
+            else:
+                doc_source_path = get_full_path(
+                    doc_metadata.get(
+                        "full_path", doc_metadata.get("source", self.source_path)
+                    )
+                )
             doc_source_owner = doc_metadata.get(
                 "owner", PebbloSafeLoader.get_file_owner_from_path(doc_source_path)
             )
@@ -526,11 +533,16 @@ class PebbloSafeLoader(BaseLoader):
         """Add Pebblo specific metadata to documents."""
         for doc in self.docs_with_id:
             doc_metadata = doc.metadata
-            doc_metadata["full_path"] = get_full_path(
-                doc_metadata.get(
-                    "full_path", doc_metadata.get("source", self.source_path)
+            if isinstance(self.loader, SharePointLoader):
+                doc_metadata["full_path"] = get_full_path(
+                    doc_metadata.get("source", self.source_path)
                 )
-            )
+            else:
+                doc_metadata["full_path"] = get_full_path(
+                    doc_metadata.get(
+                        "full_path", doc_metadata.get("source", self.source_path)
+                    )
+                )
             doc_metadata["pb_id"] = doc.pb_id
             doc_metadata["pb_checksum"] = classified_docs.get(doc.pb_id, {}).get(
                 "pb_checksum", None
