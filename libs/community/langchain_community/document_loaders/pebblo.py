@@ -10,7 +10,6 @@ from typing import Any, Dict, Iterator, List, Optional
 import requests  # type: ignore
 from langchain_core.documents import Document
 
-from langchain_community.document_loaders import SharePointLoader
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_community.utilities.pebblo import (
     APP_DISCOVER_URL,
@@ -160,7 +159,7 @@ class PebbloSafeLoader(BaseLoader):
         for doc in doc_content:
             doc_metadata = doc.get("metadata", {})
             doc_authorized_identities = doc_metadata.get("authorized_identities", [])
-            if isinstance(self.loader, SharePointLoader):
+            if self.loader.__class__.__name__ == "SharePointLoader":
                 doc_source_path = get_full_path(
                     doc_metadata.get("source", self.source_path)
                 )
@@ -200,7 +199,7 @@ class PebbloSafeLoader(BaseLoader):
                 }
             )
         if (
-            isinstance(self.loader, SharePointLoader)
+            self.loader.__class__.__name__ == "SharePointLoader"
             and not self.loader_details_updated
         ):
             self.loader_details["source_path"] = doc_metadata.get("source_full_url")
@@ -539,7 +538,7 @@ class PebbloSafeLoader(BaseLoader):
         """Add Pebblo specific metadata to documents."""
         for doc in self.docs_with_id:
             doc_metadata = doc.metadata
-            if isinstance(self.loader, SharePointLoader):
+            if self.loader.__class__.__name__ == "SharePointLoader":
                 doc_metadata["full_path"] = get_full_path(
                     doc_metadata.get("source", self.source_path)
                 )
