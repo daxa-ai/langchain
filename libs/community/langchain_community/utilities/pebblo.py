@@ -59,6 +59,7 @@ LOADER_TYPE_MAPPING = {
 }
 
 SUPPORTED_LOADERS = (*file_loader, *dir_loader, *in_memory)
+CLASSIFICATION_UNAVAILABLE = "unavailable"
 
 logger = logging.getLogger(__name__)
 

@@ -13,6 +13,7 @@ from langchain_core.documents import Document
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_community.utilities.pebblo import (
     APP_DISCOVER_URL,
+    CLASSIFICATION_UNAVAILABLE,
     CLASSIFIER_URL,
     LOADER_DOC_URL,
     PEBBLO_CLOUD_URL,
@@ -481,10 +482,15 @@ class PebbloSafeLoader(BaseLoader):
             for doc in self.docs_with_id
         }
 
-        for classified_doc in classified_docs.values():
-            doc_id = classified_doc.get("pb_id")
-            if doc_id in indexed_docs:
-                self._add_semantic_to_doc(indexed_docs[doc_id], classified_doc)
+        if not classified_docs:
+            # Add CLASSIFICATION_UNAVAILABLE to semantic metadata if no classification
+            for _, doc in indexed_docs.items():
+                self._add_semantic_to_doc(doc, {})
+        else:
+            for classified_doc in classified_docs.values():
+                doc_id = classified_doc.get("pb_id")
+                if doc_id in indexed_docs:
+                    self._add_semantic_to_doc(indexed_docs[doc_id], classified_doc)
 
         semantic_metadata_docs = [doc for doc in indexed_docs.values()]
 
@@ -506,6 +512,7 @@ class PebbloSafeLoader(BaseLoader):
     def _add_semantic_to_doc(self, doc: Document, classified_doc: dict) -> Document:
         """
         Adds semantic metadata to the given document in-place.
+        If classified_doc is empty, adds "unavailable" to semantic data.
 
         Args:
             doc (Document): A Document object.
@@ -514,12 +521,16 @@ class PebbloSafeLoader(BaseLoader):
         Returns:
             Document: The Document object with added semantic metadata.
         """
-        doc.metadata["pebblo_semantic_entities"] = list(
-            classified_doc.get("entities", {}).keys()
-        )
-        doc.metadata["pebblo_semantic_topics"] = list(
-            classified_doc.get("topics", {}).keys()
-        )
+        if classified_doc:
+            doc.metadata["pebblo_semantic_entities"] = list(
+                classified_doc.get("entities", {}).keys()
+            )
+            doc.metadata["pebblo_semantic_topics"] = list(
+                classified_doc.get("topics", {}).keys()
+            )
+        else:
+            doc.metadata["pebblo_semantic_entities"] = [CLASSIFICATION_UNAVAILABLE]
+            doc.metadata["pebblo_semantic_topics"] = [CLASSIFICATION_UNAVAILABLE]
         return doc
 
     def _add_pebblo_specific_metadata(self, classified_docs: dict) -> None:

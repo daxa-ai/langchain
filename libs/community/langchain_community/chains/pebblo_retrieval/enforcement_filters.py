@@ -21,6 +21,7 @@ from langchain_community.chains.pebblo_retrieval.models import (
     AuthContext,
     SemanticContext,
 )
+from langchain_community.utilities.pebblo import CLASSIFICATION_UNAVAILABLE
 
 logger = logging.getLogger(__name__)
 
@@ -522,6 +523,9 @@ def _set_semantic_enforcement_filter(
     This method sets the semantic enforcement filter in the search_kwargs
     of the retriever based on the type of the vectorstore.
     """
+    # Add CLASSIFICATION_UNAVAILABLE to deny list if it's not empty
+    add_unavailable_to_deny_list(semantic_context)
+    # Apply semantic filter
     search_kwargs = retriever.search_kwargs
     if retriever.vectorstore.__class__.__name__ == PINECONE:
         _apply_pinecone_semantic_filter(search_kwargs, semantic_context)
@@ -529,3 +533,18 @@ def _set_semantic_enforcement_filter(
         _apply_qdrant_semantic_filter(search_kwargs, semantic_context)
     elif retriever.vectorstore.__class__.__name__ == PGVECTOR:
         _apply_pgvector_semantic_filter(search_kwargs, semantic_context)
+
+
+def add_unavailable_to_deny_list(sem_ctx: Optional[SemanticContext]) -> None:
+    """
+    Add CLASSIFICATION_UNAVAILABLE to deny list if it's not empty.
+    This function handles documents with missing semantic metadata.
+    """
+    if sem_ctx is None:
+        return
+    if sem_ctx.pebblo_semantic_entities and sem_ctx.pebblo_semantic_entities.deny:
+        if CLASSIFICATION_UNAVAILABLE not in sem_ctx.pebblo_semantic_entities.deny:
+            sem_ctx.pebblo_semantic_entities.deny.append(CLASSIFICATION_UNAVAILABLE)
+    if sem_ctx.pebblo_semantic_topics and sem_ctx.pebblo_semantic_topics.deny:
+        if CLASSIFICATION_UNAVAILABLE not in sem_ctx.pebblo_semantic_topics.deny:
+            sem_ctx.pebblo_semantic_topics.deny.append(CLASSIFICATION_UNAVAILABLE)
