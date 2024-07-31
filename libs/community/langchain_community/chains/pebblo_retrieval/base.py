@@ -8,7 +8,6 @@ import inspect
 import json
 import logging
 from http import HTTPStatus
-from importlib.metadata import version
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests  # type: ignore
@@ -30,7 +29,6 @@ from langchain_community.chains.pebblo_retrieval.enforcement_filters import (
 from langchain_community.chains.pebblo_retrieval.models import (
     App,
     AuthContext,
-    Framework,
     Qa,
     SemanticContext,
 )
@@ -349,10 +347,6 @@ class PebbloRetrievalQA(Chain):
             framework=framework,
             chains=chains,
             plugin_version=PLUGIN_VERSION,
-            client_version=Framework(
-                name="langchain_community",
-                version=version("langchain_community"),
-            ),
         )
         return app
 
@@ -568,8 +562,6 @@ class PebbloRetrievalQA(Chain):
                     json=prompt_payload,
                     timeout=20,
                 )
-
-                logger.debug("prompt-payload: %s", prompt_payload)
                 logger.debug(
                     "send_prompt[local]: request url %s, body %s len %s\
                         response status %s body %s",
