@@ -199,6 +199,44 @@ class PebbloRetrievalQA(Chain):
             input_documents=docs, question=question, callbacks=_run_manager.get_child()
         )
 
+        qa = {
+            "name": self.app_name,
+            "context": [
+                {
+                    "retrieved_from": doc.metadata.get(
+                        "full_path", doc.metadata.get("source")
+                    ),
+                    "doc": doc.page_content,
+                    "vector_db": self.retriever.vectorstore.__class__.__name__,
+                    **(
+                        {"pb_checksum": doc.metadata.get("pb_checksum")}
+                        if doc.metadata.get("pb_checksum")
+                        else {}
+                    ),
+                }
+                for doc in docs
+                if isinstance(doc, Document)
+            ],
+            "prompt": {
+                "data": question,
+                "entities": prompt_entities.get("entities", {}),
+                "entityCount": prompt_entities.get("entityCount", 0),
+                "prompt_gov_enabled": self.enable_prompt_gov,
+            },
+            "response": {
+                "data": answer,
+            },
+            "prompt_time": datetime.datetime.now().isoformat(),
+            "user": auth_context.user_id if auth_context else "unknown",
+            "user_identities": auth_context.user_auth
+            if auth_context and hasattr(auth_context, "user_auth")
+            else [],
+            "classifier_location": self.classifier_location,
+        }
+
+        qa_payload = Qa(**qa)
+        self._send_prompt(qa_payload)
+
         if self.return_source_documents:
             return {self.output_key: answer, "source_documents": docs}
         else:
