@@ -51,7 +51,7 @@ from langchain_core.runnables import Runnable, RunnableMap, RunnablePassthrough
 from langchain_core.tools import BaseTool
 from langchain_core.utils import convert_to_secret_str, get_from_dict_or_env
 from langchain_core.utils.function_calling import convert_to_openai_tool
-from langchain_core.utils.pydantic import is_basemodel_subclass
+from langchain_core.utils.pydantic import get_fields, is_basemodel_subclass
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +200,7 @@ class QianfanChatEndpoint(BaseChatModel):
                 ("system", "你是一名专业的翻译家，可以将用户的中文翻译为英文。"),
                 ("human", "我喜欢编程。"),
             ]
-            qianfan_chat.invoke(message)
+            qianfan_chat.invoke(messages)
 
         .. code-block:: python
 
@@ -219,6 +219,7 @@ class QianfanChatEndpoint(BaseChatModel):
 
         .. code-block:: python
 
+            stream = chat.stream(messages)
             full = next(stream)
             for chunk in stream:
                 full += chunk
@@ -380,8 +381,6 @@ class QianfanChatEndpoint(BaseChatModel):
     """Endpoint of the Qianfan LLM, required if custom model used."""
 
     class Config:
-        """Configuration for this pydantic object."""
-
         allow_population_by_field_name = True
 
     @root_validator(pre=True)
@@ -399,7 +398,7 @@ class QianfanChatEndpoint(BaseChatModel):
 
         default_values = {
             name: field.default
-            for name, field in cls.__fields__.items()
+            for name, field in get_fields(cls).items()
             if field.default is not None
         }
         default_values.update(values)
