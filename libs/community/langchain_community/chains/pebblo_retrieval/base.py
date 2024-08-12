@@ -556,7 +556,7 @@ class PebbloRetrievalQA(Chain):
             raise NameError("API key is missing for sending prompt to Pebblo cloud.")
 
     def _check_prompt_validity(
-        self, question: str, semantic_context: SemanticContext
+        self, question: str, semantic_context: Optional[SemanticContext]
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Check the validity of the given prompt using a remote classification service.
@@ -584,7 +584,8 @@ class PebbloRetrievalQA(Chain):
         prompt_gov_api_url = f"{self.classifier_url}{PROMPT_GOV_URL}"
 
         is_valid_prompt = True
-        prompt_entities = {"entities": {}, "entityCount": 0, "entityDetails": {}}
+        k: dict = dict()
+        prompt_entities: dict = {"entities": {}, "entityCount": 0, "entityDetails": k}
 
         # Extract deny lists from the semantic context
         group_deny_list = (
