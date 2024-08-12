@@ -27,11 +27,18 @@ class SemanticTopics(BaseModel):
     deny: List[str]
 
 
+class SemanticEntityGroup(BaseModel):
+    """Class for a semantic entity group filter."""
+
+    deny: List[str]
+
+
 class SemanticContext(BaseModel):
     """Class for a semantic context."""
 
     pebblo_semantic_entities: Optional[SemanticEntities] = None
     pebblo_semantic_topics: Optional[SemanticTopics] = None
+    pebblo_entity_group: Optional[SemanticEntityGroup] = None
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
@@ -40,10 +47,11 @@ class SemanticContext(BaseModel):
         if (
             self.pebblo_semantic_entities is None
             and self.pebblo_semantic_topics is None
+            and self.pebblo_entity_group is None
         ):
             raise ValueError(
                 "semantic_context must contain 'pebblo_semantic_entities' or "
-                "'pebblo_semantic_topics'"
+                "'pebblo_semantic_topics' or 'pebblo_entity_group'"
             )
 
 
@@ -134,9 +142,11 @@ class Context(BaseModel):
 
 class Prompt(BaseModel):
     data: Optional[Union[list, str]]
-    entityCount: Optional[int]
     entities: Optional[dict]
-    prompt_gov_enabled: Optional[bool]
+    entityCount: Optional[int]
+    entityDetails: Optional[dict]
+    promptGovEnabled: Optional[bool]
+    promptBlocked: Optional[bool]
 
 
 class Qa(BaseModel):
