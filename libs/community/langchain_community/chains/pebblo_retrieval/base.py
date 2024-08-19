@@ -582,8 +582,11 @@ class PebbloRetrievalQA(Chain):
         prompt_gov_api_url = f"{self.classifier_url}{PROMPT_GOV_URL}"
 
         is_valid_prompt = True
-        k: dict = dict()
-        prompt_entities: dict = {"entities": {}, "entityCount": 0, "entityDetails": k}
+        prompt_entities: dict = {
+            "entities": {},
+            "entityCount": 0,
+            "entityDetails": dict(),
+        }
 
         # Extract deny lists from the semantic context
         group_deny_list = (
