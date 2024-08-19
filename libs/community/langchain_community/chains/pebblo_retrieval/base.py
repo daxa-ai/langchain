@@ -82,6 +82,16 @@ class PebbloRetrievalQA(Chain):
     """Flag to check if prompt payload has been sent."""
     enable_prompt_gov: bool = True  #: :meta private:
     """Flag to check if prompt governance is enabled or not"""
+    block_prompt: bool = True
+    """
+    Flag to determine whether prompting should be blocked.
+    - True: Prompts are blocked.
+    - False: Prompts are allowed.
+    """
+    prompt_message: str = "Your prompt is blocked as it has some sensitive information."
+    """
+    Message displayed to the user when a prompt is blocked due to sensitive content.
+    """
 
     def _call(
         self,
@@ -105,20 +115,34 @@ class PebbloRetrievalQA(Chain):
         question = inputs[self.input_key]
         auth_context = inputs.get(self.auth_context_key, {})
         semantic_context = inputs.get(self.semantic_context_key, {})
-        _, prompt_entities = self._check_prompt_validity(question)
-
-        accepts_run_manager = (
-            "run_manager" in inspect.signature(self._get_docs).parameters
-        )
-        if accepts_run_manager:
-            docs = self._get_docs(
-                question, auth_context, semantic_context, run_manager=_run_manager
+        is_prompt_valid: bool = True
+        is_prompt_blocked: bool = False
+        prompt_entities: dict = {}
+        if self.enable_prompt_gov:
+            is_prompt_valid, prompt_entities = self._check_prompt_validity(
+                question, semantic_context
             )
+
+        if self.block_prompt and is_prompt_valid is False:
+            docs = []
+            is_prompt_blocked = True
+            answer = self.prompt_message
         else:
-            docs = self._get_docs(question, auth_context, semantic_context)  # type: ignore[call-arg]
-        answer = self.combine_documents_chain.run(
-            input_documents=docs, question=question, callbacks=_run_manager.get_child()
-        )
+            accepts_run_manager = (
+                "run_manager" in inspect.signature(self._get_docs).parameters
+            )
+            if accepts_run_manager:
+                docs = self._get_docs(
+                    question, auth_context, semantic_context, run_manager=_run_manager
+                )
+            else:
+                docs = self._get_docs(question, auth_context, semantic_context)  # type: ignore[call-arg]
+
+            answer = self.combine_documents_chain.run(
+                input_documents=docs,
+                question=question,
+                callbacks=_run_manager.get_child(),
+            )
 
         qa = {
             "name": self.app_name,
@@ -142,7 +166,9 @@ class PebbloRetrievalQA(Chain):
                 "data": question,
                 "entities": prompt_entities.get("entities", {}),
                 "entityCount": prompt_entities.get("entityCount", 0),
-                "prompt_gov_enabled": self.enable_prompt_gov,
+                "entityDetails": prompt_entities.get("entityDetails", {}),
+                "promptGovEnabled": self.enable_prompt_gov,
+                "promptBlocked": is_prompt_blocked,
             },
             "response": {
                 "data": answer,
@@ -154,7 +180,7 @@ class PebbloRetrievalQA(Chain):
             else [],
             "classifier_location": self.classifier_location,
         }
-
+        logger.info(f"QA------ {qa}")
         qa_payload = Qa(**qa)
         self._send_prompt(qa_payload)
 
@@ -187,7 +213,9 @@ class PebbloRetrievalQA(Chain):
             "run_manager" in inspect.signature(self._aget_docs).parameters
         )
 
-        _, prompt_entities = self._check_prompt_validity(question)
+        is_valid_prompt, prompt_entities = self._check_prompt_validity(
+            question, semantic_context
+        )
 
         if accepts_run_manager:
             docs = await self._aget_docs(
@@ -443,7 +471,7 @@ class PebbloRetrievalQA(Chain):
                     json=payload,
                     timeout=20,
                 )
-                logger.debug("prompt-payload: %s", payload)
+
                 logger.debug(
                     "send_prompt[local]: request url %s, body %s len %s\
                         response status %s body %s",
@@ -525,20 +553,25 @@ class PebbloRetrievalQA(Chain):
             logger.warning("API key is missing for sending prompt to Pebblo cloud.")
             raise NameError("API key is missing for sending prompt to Pebblo cloud.")
 
-    def _check_prompt_validity(self, question: str) -> Tuple[bool, Dict[str, Any]]:
+    def _check_prompt_validity(
+        self, question: str, semantic_context: Optional[SemanticContext]
+    ) -> Tuple[bool, Dict[str, Any]]:
         """
         Check the validity of the given prompt using a remote classification service.
 
-        This method sends a prompt to a remote classifier service and return entities
-        present in prompt or not.
+        This method sends a prompt to a remote classifier service and returns entities
+        present in the prompt or not.
 
         Args:
             question (str): The prompt question to be validated.
+            semantic_context (SemanticContext): The semantic context containing
+            deny lists.
 
         Returns:
             bool: True if the prompt is valid (does not contain deny list entities),
             False otherwise.
-            dict: The entities present in the prompt
+            dict: A dictionary containing details about the entities present
+            in the prompt.
         """
 
         headers = {
@@ -546,12 +579,34 @@ class PebbloRetrievalQA(Chain):
             "Content-Type": "application/json",
         }
         prompt_payload = {"prompt": question}
-        is_valid_prompt: bool = True
         prompt_gov_api_url = f"{self.classifier_url}{PROMPT_GOV_URL}"
-        pebblo_resp = None
-        prompt_entities: dict = {"entities": {}, "entityCount": 0}
+
+        is_valid_prompt = True
+        prompt_entities: dict = {
+            "entities": {},
+            "entityCount": 0,
+            "entityDetails": dict(),
+        }
+
+        # Extract deny lists from the semantic context
+        group_deny_list = (
+            semantic_context.pebblo_entity_group.deny
+            if semantic_context and semantic_context.pebblo_entity_group
+            else []
+        )
+        entity_deny_list = (
+            semantic_context.pebblo_semantic_entities.deny
+            if semantic_context and semantic_context.pebblo_semantic_entities
+            else []
+        )
+
+        # Perform the check using the local classifier
         if self.classifier_location == "local":
             try:
+                logger.info(
+                    f"Sending Prompt Governance request to {prompt_gov_api_url}"
+                )
+
                 pebblo_resp = requests.post(
                     prompt_gov_api_url,
                     headers=headers,
@@ -559,30 +614,32 @@ class PebbloRetrievalQA(Chain):
                     timeout=20,
                 )
 
-                logger.debug("prompt-payload: %s", prompt_payload)
-                logger.debug(
-                    "send_prompt[local]: request url %s, body %s len %s\
-                        response status %s body %s",
-                    pebblo_resp.request.url,
-                    str(pebblo_resp.request.body),
-                    str(
-                        len(
-                            pebblo_resp.request.body if pebblo_resp.request.body else []
-                        )
-                    ),
-                    str(pebblo_resp.status_code),
-                    pebblo_resp.json(),
-                )
-                logger.debug(f"pebblo_resp.json() {pebblo_resp.json()}")
-                prompt_entities["entities"] = pebblo_resp.json().get("entities", {})
-                prompt_entities["entityCount"] = pebblo_resp.json().get(
-                    "entityCount", 0
+                pebblo_resp_data = pebblo_resp.json()
+                prompt_entities["entities"] = pebblo_resp_data.get("entities", {})
+                prompt_entities["entityCount"] = pebblo_resp_data.get("entityCount", 0)
+                prompt_entities["entityDetails"] = pebblo_resp_data.get(
+                    "entityDetails", {}
                 )
 
+                if self.block_prompt:
+                    # Check if any entities or entity groups are in the deny lists
+                    for entity, details in prompt_entities["entityDetails"].items():
+                        if entity in entity_deny_list:
+                            is_valid_prompt = False
+                            break
+                        for detail in details:
+                            if detail.get("entity_group").strip() in map(
+                                str.strip, group_deny_list
+                            ):
+                                is_valid_prompt = False
+                                break
+
             except requests.exceptions.RequestException:
-                logger.warning("Unable to reach pebblo server.")
+                logger.warning("Unable to reach Pebblo server.")
             except Exception as e:
-                logger.warning("An Exception caught in _send_discover: local %s", e)
+                logger.warning(f"Exception caught in prompt governance: {str(e)}")
+                logger.debug("Traceback: ", exc_info=True)
+
         return is_valid_prompt, prompt_entities
 
     @classmethod
