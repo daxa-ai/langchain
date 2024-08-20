@@ -8,6 +8,9 @@ from http import HTTPStatus
 from importlib.metadata import version
 from typing import Any, Dict, Iterator, List, Optional
 
+import re
+import ast
+
 import requests  # type: ignore
 from langchain_core.documents import Document
 
@@ -52,6 +55,7 @@ class PebbloSafeLoader(BaseLoader):
         classifier_url: Optional[str] = None,
         *,
         classifier_location: str = "local",
+        **kwargs
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
@@ -66,6 +70,7 @@ class PebbloSafeLoader(BaseLoader):
         self.source_owner = PebbloSafeLoader.get_file_owner_from_path(self.source_path)
         self.docs: List[Document] = []
         self.docs_with_id: List[IndexedDocument] = []
+        self.kwargs = kwargs.get("kwargs")
         loader_name = str(type(self.loader)).split(".")[-1].split("'")[0]
         self.source_type = get_loader_type(loader_name)
         self.source_path_size = self.get_source_size(self.source_path)
@@ -166,6 +171,22 @@ class PebbloSafeLoader(BaseLoader):
     def set_loader_sent(cls) -> None:
         cls._loader_sent = True
 
+    def _get_auth_field(self, auth_field_name:str, page_content:str) -> List[str]:
+        result_list: List[str] = []
+        # Extract the AUTH_FIELD block
+        auth_field_match = re.search(r'AUTH_FIELD: \[.*\]', page_content, re.DOTALL)
+        if auth_field_match:
+            auth_field_str = auth_field_match.group(0).replace('AUTH_FIELD: ', '')
+            # Convert the string representation of the list to an actual list using ast.literal_eval
+            auth_field_list = ast.literal_eval(auth_field_str)
+
+            # Create the dictionary
+            result_list = auth_field_list
+            print(f'AUTH_FIELD: {result_list}')
+        else:
+            print("AUTH_FIELD not found")
+        return result_list
+
     def _classify_doc(self, loading_end: bool = False) -> dict:
         """Send documents fetched from loader to pebblo-server. Then send
         classified documents to Daxa cloud(If api_key is present). Internal method.
@@ -186,6 +207,13 @@ class PebbloSafeLoader(BaseLoader):
         for doc in doc_content:
             doc_metadata = doc.get("metadata", {})
             doc_authorized_identities = doc_metadata.get("authorized_identities", [])
+            if self.loader.__class__.__name__ == "SnowflakeLoader" and self.kwargs is not None:
+                if self.kwargs.get("auth_field") is not None:
+                    # Snowflake Table column name for authorized_identities
+                    # e.g. values [joe@acme.com, hr-exec-group@acme.com]
+                    column_name = self.kwargs.get("auth_field")
+                    page_content = doc.get("page_content", "")
+                    doc_authorized_identities = self._get_auth_field(column_name, page_content)
             if self.loader.__class__.__name__ == "SharePointLoader":
                 doc_source_path = get_full_path(
                     doc_metadata.get("source", self.source_path)
