@@ -171,7 +171,58 @@ class PebbloSafeLoader(BaseLoader):
     def set_loader_sent(cls) -> None:
         cls._loader_sent = True
 
+    def _get_authfield_from_md(self, doc, auth_field_name:str):
+        auth_field_list: List[str] = []
+        # Extract the AUTH_FIELD block
+        auth_field_str = doc.metadata.get(auth_field_name, "")
+        if auth_field_str:
+            # Convert the string representation of the list to an actual list using ast.literal_eval
+            auth_field_list = ast.literal_eval(auth_field_str)
+
+            # Remove the AUTH_FIELD part from the original string]
+            # TODO: check if regexe eats the text after the last match
+            auth_field_match = re.search(rf'{auth_field_name}: \[.*\][\n]', doc.page_content, re.DOTALL)
+            if auth_field_match:
+                doc.page_content = doc.page_content.replace(auth_field_match.group(0), '').strip()
+            print(f'AUTH_FIELD: {auth_field_list}')
+            doc.metadata["authorized_identities"] = auth_field_list
+        else:
+            print("AUTH_FIELD not found")
+
+    def _get_sourcefield_from_md(self, doc, source_field_name:str):
+        auth_field_str = doc.metadata.get(source_field_name, "")
+        if auth_field_str:
+            # Remove the AUTH_FIELD part from the original string
+            # TODO: check if regexe eats the text after the last match
+            auth_field_match = re.search(rf'{source_field_name}: .*', doc.page_content, re.DOTALL)
+            if auth_field_match:
+                doc.page_content = doc.page_content.replace(auth_field_match.group(0), '').strip()
+            print(f'SOURCE_FIELD: {auth_field_str}')
+            doc.metadata["full_path"] = auth_field_str
+        else:
+            print("SOURCE_FIELD not found")
+
     def _get_auth_field(self, auth_field_name:str, page_content:str) -> Tuple[List[str], str]:
+        result_list: List[str] = []
+        # Extract the AUTH_FIELD block
+        auth_field_match = re.search(rf'{auth_field_name}: \[.*\]', page_content, re.DOTALL)
+        if auth_field_match:
+            auth_field_str = auth_field_match.group(0).replace(f'{auth_field_name}: ', '')
+            # Convert the string representation of the list to an actual list using ast.literal_eval
+            auth_field_list = ast.literal_eval(auth_field_str)
+
+            # Create the dictionary
+            result_list = auth_field_list
+
+            # Remove the AUTH_FIELD part from the original string
+            page_content = page_content.replace(auth_field_match.group(0), '').strip()
+
+            print(f'AUTH_FIELD: {result_list}')
+        else:
+            print("AUTH_FIELD not found")
+        return result_list, page_content
+
+    def _get_auth_field_v0(self, auth_field_name:str, page_content:str) -> Tuple[List[str], str]:
         result_list: List[str] = []
         # Extract the AUTH_FIELD block
         auth_field_match = re.search(r'AUTH_FIELD: \[.*\]', page_content, re.DOTALL)
@@ -215,6 +266,8 @@ class PebbloSafeLoader(BaseLoader):
                 doc_source_path = get_full_path(
                     doc_metadata.get("source", self.source_path)
                 )
+            elif self.loader.__class__.__name__ == "SnowflakeLoader":
+                doc_source_path = doc_metadata.get("METADATA_SOURCE", "")
             else:
                 doc_source_path = get_full_path(
                     doc_metadata.get(
@@ -599,10 +652,13 @@ class PebbloSafeLoader(BaseLoader):
                     # Snowflake Table column name for authorized_identities
                     # e.g. values [joe@acme.com, hr-exec-group@acme.com]
                     column_name = self.kwargs.get("auth_field")
-                    page_content = doc.page_content
-                    authorized_identities, new_page_content = self._get_auth_field(column_name, page_content)
-                    doc.page_content = new_page_content
-                    doc_metadata["authorized_identities"] = authorized_identities
+                    # authorized_identities, new_page_content = self._get_auth_field(column_name, page_content)
+                    self._get_authfield_from_md(doc, column_name)
+                if self.kwargs.get("source_field") is not None:
+                    # Snowflake Table column name for authorized_identities
+                    # e.g. values [joe@acme.com, hr-exec-group@acme.com]
+                    column_name = self.kwargs.get("source_field")
+                    self._get_sourcefield_from_md(doc, column_name)
             if self.loader.__class__.__name__ == "SharePointLoader":
                 doc_metadata["full_path"] = get_full_path(
                     doc_metadata.get("source", self.source_path)
