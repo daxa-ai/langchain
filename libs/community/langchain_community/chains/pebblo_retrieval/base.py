@@ -454,6 +454,7 @@ class PebbloRetrievalQA(Chain):
                     timeout=20,
                 )
                 logger.debug("prompt-payload: %s", payload)
+                # print("CONTEXT: prompt-payload: %s", payload)
                 logger.debug(
                     "send_prompt[local]: request url %s, body %s len %s\
                         response status %s body %s",
