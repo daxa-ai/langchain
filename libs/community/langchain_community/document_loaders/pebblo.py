@@ -277,6 +277,8 @@ class PebbloSafeLoader(BaseLoader):
             doc_source_owner = doc_metadata.get(
                 "owner", PebbloSafeLoader.get_file_owner_from_path(doc_source_path)
             )
+            if self.loader.__class__.__name__ == "SnowflakeLoader":
+                doc_source_owner = "dbadmin"
             doc_source_size = doc_metadata.get(
                 "size", self.get_source_size(doc_source_path)
             )
@@ -648,16 +650,15 @@ class PebbloSafeLoader(BaseLoader):
         for doc in self.docs_with_id:
             doc_metadata = doc.metadata
             if self.loader.__class__.__name__ == "SnowflakeLoader" and self.kwargs is not None:
-                if self.kwargs.get("auth_field") is not None:
+                if self.kwargs.get("auth_identities") is not None:
                     # Snowflake Table column name for authorized_identities
                     # e.g. values [joe@acme.com, hr-exec-group@acme.com]
-                    column_name = self.kwargs.get("auth_field")
-                    # authorized_identities, new_page_content = self._get_auth_field(column_name, page_content)
+                    column_name = self.kwargs.get("auth_identities")
                     self._get_authfield_from_md(doc, column_name)
-                if self.kwargs.get("source_field") is not None:
+                if self.kwargs.get("source") is not None:
                     # Snowflake Table column name for authorized_identities
                     # e.g. values [joe@acme.com, hr-exec-group@acme.com]
-                    column_name = self.kwargs.get("source_field")
+                    column_name = self.kwargs.get("source")
                     self._get_sourcefield_from_md(doc, column_name)
             if self.loader.__class__.__name__ == "SharePointLoader":
                 doc_metadata["full_path"] = get_full_path(
