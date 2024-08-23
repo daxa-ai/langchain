@@ -184,10 +184,11 @@ class PebbloSafeLoader(BaseLoader):
             auth_field_match = re.search(rf'{auth_field_name}: \[.*\][\n]', doc.page_content, re.DOTALL)
             if auth_field_match:
                 doc.page_content = doc.page_content.replace(auth_field_match.group(0), '').strip()
-            print(f'AUTH_FIELD: {auth_field_list}')
+            # print(f'AUTH_FIELD: {auth_field_list}')
             doc.metadata["authorized_identities"] = auth_field_list
         else:
-            print("AUTH_FIELD not found")
+            # print("AUTH_FIELD not found")
+            pass
 
     def _get_sourcefield_from_md(self, doc, source_field_name:str):
         auth_field_str = doc.metadata.get(source_field_name, "")
@@ -197,10 +198,11 @@ class PebbloSafeLoader(BaseLoader):
             auth_field_match = re.search(rf'{source_field_name}: .*', doc.page_content, re.DOTALL)
             if auth_field_match:
                 doc.page_content = doc.page_content.replace(auth_field_match.group(0), '').strip()
-            print(f'SOURCE_FIELD: {auth_field_str}')
+            # print(f'SOURCE_FIELD: {auth_field_str}')
             doc.metadata["full_path"] = auth_field_str
         else:
-            print("SOURCE_FIELD not found")
+            # print("SOURCE_FIELD not found")
+            pass
 
     def _get_auth_field(self, auth_field_name:str, page_content:str) -> Tuple[List[str], str]:
         result_list: List[str] = []
