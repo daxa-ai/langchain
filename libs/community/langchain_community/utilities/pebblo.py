@@ -429,7 +429,6 @@ class PebbloLoaderAPIWrapper(BaseModel):
     anonymize_snippets: bool = False
     """Boolean, specifying whether to anonymize snippets in the document."""
 
-
     def __init__(self, **kwargs: Any):
         """Validate that api key in environment."""
         kwargs["api_key"] = get_from_dict_or_env(
