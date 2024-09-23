@@ -154,6 +154,8 @@ class Doc(BaseModel):
     """Owner of the source of the loader."""
     classifier_location: str
     """Location of the classifier."""
+    anonymize_snippets: bool
+    """Boolean, specifying whether to anonymize snippets in the document."""
 
 
 def get_full_path(path: str) -> str:
@@ -425,7 +427,8 @@ class PebbloLoaderAPIWrapper(BaseModel):
     cloud_url: Optional[str]
     """URL of the Pebblo Cloud"""
     anonymize_snippets: bool = False
-    """Anonymize snippets in the document"""
+    """Boolean, specifying whether to anonymize snippets in the document."""
+
 
     def __init__(self, **kwargs: Any):
         """Validate that api key in environment."""
