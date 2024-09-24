@@ -35,7 +35,7 @@ class SlackAPIWrapper(BaseModel):
                 "The 'slack_sdk' package is not installed. "
                 "Please install it using 'pip install slack_sdk'."
             )
-        client = WebClient(token=kwargs["api_key"])
+        client = WebClient(token=kwargs["token"])
         kwargs["slack_client"] = client
 
         super().__init__(**kwargs)
@@ -56,12 +56,13 @@ class SlackAPIWrapper(BaseModel):
             respective details.
         """
         try:
-            channels = self.slack_client.conversations_list(types=types)
+            response = self.slack_client.conversations_list(types=types)
+            channels = response.get("channels", [])
             return {
                 channel["name"]: {
                     "id": channel.get("id"),
                     "name": channel.get("name"),
-                    "type": channel.get("type"),
+                    "is_private": channel.get("is_private"),
                 }
                 for channel in channels
             }
@@ -71,7 +72,8 @@ class SlackAPIWrapper(BaseModel):
     def get_user_details_map(self) -> Dict[str, Dict[str, str]]:
         """Get a dictionary mapping user IDs to their respective details."""
         try:
-            users = self.slack_client.users_list()
+            response = self.slack_client.users_list()
+            users = response.get("members", [])
             return {
                 user["id"]: {
                     "name": user.get("name"),
