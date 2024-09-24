@@ -89,9 +89,18 @@ class SlackAPIWrapper(BaseModel):
     def get_messages(self, channel: str, limit: int = 1000) -> Any:
         """Get messages from a channel."""
         try:
-            messages = self.slack_client.conversations_history(
+            response = self.slack_client.conversations_history(
                 channel=channel, limit=limit
             )
+            messages = response.get("messages", [])
+
+            # Include replies to message in thread if available
+            for message in messages:
+                if message.get("thread_ts"):
+                    thread_response = self.slack_client.conversations_replies(
+                        channel=channel, ts=message["ts"]
+                    )
+                    message["replies"] = thread_response.get("messages", [])
             return messages
         except Exception as e:
             logger.error(f"Error getting messages from Slack: {e}")

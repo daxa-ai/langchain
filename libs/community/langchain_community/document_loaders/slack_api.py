@@ -88,12 +88,29 @@ class SlackAPILoader(BaseLoader):
         Returns:
             Document: A Document object representing the message.
         """
-        text = message.get("text", "")
+        text = self._enriched_message_text(message)
         metadata = self._get_message_metadata(message, channel_name)
         return Document(
             page_content=text,
             metadata=metadata,
         )
+
+    def _enriched_message_text(self, message: dict) -> str:
+        """
+        Enrich the message text with replies in the thread.
+
+        Args:
+            message (dict): The message to enrich.
+
+        Returns:
+            str: The enriched message text.
+        """
+        replies = message.get("replies", [])
+        if not replies:
+            return message.get("text", "")
+        # Get text from each reply(First reply is the original message)
+        reply_texts = [reply.get("text", "") for reply in replies]
+        return "\n\n".join(reply_texts)
 
     def _get_message_metadata(self, message: dict, channel_name: str) -> dict:
         """Create and return metadata for a given message and channel."""
