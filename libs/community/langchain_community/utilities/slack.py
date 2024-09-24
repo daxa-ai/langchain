@@ -105,3 +105,53 @@ class SlackAPIWrapper(BaseModel):
         except Exception as e:
             logger.error(f"Error getting messages from Slack: {e}")
             return None
+
+    def get_channel_members(self, channel: str) -> list:
+        """
+        Get a list of members in a conversation
+        """
+        try:
+            response = self.slack_client.conversations_members(channel=channel)
+            return response.get("members", [])
+        except Exception as e:
+            logger.error(f"Error getting members for channel {channel}: {e}")
+            return []
+
+    def get_authorized_identities(
+        self, channel_name: str, user_details_map: dict, channel_details_map: dict
+    ):
+        """
+        Get a list of authorized identities for a given channel.
+        An authorized identity is a user who has posted a message in the channel.
+
+        Args:
+            channel_name (str): The channel name.
+            user_details_map (dict): A dictionary mapping user IDs to their respective details.
+            channel_details_map (dict): A dictionary mapping channel names to their respective details.
+
+        Returns:
+            list: A list of authorized identities(user details) for the given channel.
+        """
+        try:
+            authorized_identities = []
+
+            channel_details = channel_details_map.get(channel_name, {})
+
+            _is_private = channel_details.get("is_private", False)
+
+            if _is_private:
+                members = self.get_channel_members(channel_details.get("id"))
+            else:
+                members = user_details_map.keys()
+
+            for member in members:
+                user = user_details_map.get(member, {})
+                user_email = user.get("email")
+                if user_email:
+                    authorized_identities.append(user_email)
+            return authorized_identities
+        except Exception as e:
+            logger.error(
+                f"Error getting authorized identities for channel {channel_name}: {e}"
+            )
+            return []

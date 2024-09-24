@@ -72,11 +72,20 @@ class SlackAPILoader(BaseLoader):
             messages = self.client.get_messages(
                 channel=channel_id, limit=self.message_limit
             )
+            authorized_identities = []
+            if messages and self.load_auth:
+                # Load authorized identities if load_auth is True
+                authorized_identities = self.client.get_authorized_identities(
+                    channel_name, self.user_details_map, self.channel_details_map
+                )
+
             for message in messages:
-                yield self._convert_message_to_document(message, channel_name)
+                yield self._convert_message_to_document(
+                    message, channel_name, authorized_identities
+                )
 
     def _convert_message_to_document(
-        self, message: dict, channel_name: str
+        self, message: dict, channel_name: str, authorized_identities: list = []
     ) -> Document:
         """
         Convert a message to a Document object.
@@ -89,7 +98,9 @@ class SlackAPILoader(BaseLoader):
             Document: A Document object representing the message.
         """
         text = self._enriched_message_text(message)
-        metadata = self._get_message_metadata(message, channel_name)
+        metadata = self._get_message_metadata(
+            message, channel_name, authorized_identities
+        )
         return Document(
             page_content=text,
             metadata=metadata,
@@ -112,7 +123,9 @@ class SlackAPILoader(BaseLoader):
         reply_texts = [reply.get("text", "") for reply in replies]
         return "\n\n".join(reply_texts)
 
-    def _get_message_metadata(self, message: dict, channel_name: str) -> dict:
+    def _get_message_metadata(
+        self, message: dict, channel_name: str, authorized_identities: list = []
+    ) -> dict:
         """Create and return metadata for a given message and channel."""
         timestamp = message.get("ts", "")
         user = message.get("user", "")
@@ -122,6 +135,7 @@ class SlackAPILoader(BaseLoader):
             "channel": channel_name,
             "timestamp": timestamp,
             "user": user,
+            "authorized_identities": authorized_identities,
         }
 
     def _get_message_source(self, channel_name: str, user: str, timestamp: str) -> str:
