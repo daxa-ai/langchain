@@ -136,7 +136,9 @@ class SlackAPIWrapper(BaseModel):
                     message["replies"] = thread_response.get("messages", [])
             return messages
         except Exception as e:
-            logger.error(f"Error getting messages from Slack: {e}")
+            logger.error(
+                f"Error getting messages from Slack channel:{channel}, error: {e}"
+            )
             return None
 
     def get_channel_members(self, channel: str) -> list:
@@ -176,18 +178,17 @@ class SlackAPIWrapper(BaseModel):
         Returns:
             list: A list of authorized identities(user details) for the given channel.
         """
+        authorized_identities = []
         try:
-            authorized_identities = []
-
             channel_details = channel_details_map.get(channel_name, {})
-
+            # Check if the channel is private
             _is_private = channel_details.get("is_private", False)
-
+            # Get members of the channel if it is private else get all users
             if _is_private:
                 members = self.get_channel_members(channel_details.get("id"))
             else:
                 members = list(user_details_map.keys())
-
+            # Get user details for each member and add email to authorized identities
             for member in members:
                 user = user_details_map.get(member, {})
                 user_email = user.get("email")
@@ -198,4 +199,4 @@ class SlackAPIWrapper(BaseModel):
             logger.error(
                 f"Error getting authorized identities for channel {channel_name}: {e}"
             )
-            return []
+            return authorized_identities
