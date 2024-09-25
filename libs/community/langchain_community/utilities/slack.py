@@ -122,12 +122,17 @@ class SlackAPIWrapper(BaseModel):
     ):
         """
         Get a list of authorized identities for a given channel.
-        An authorized identity is a user who has posted a message in the channel.
+        An authorized identity is a user who has access to the channel.
+        If the channel is private, only members of the channel are considered
+        authorized.
+        If the channel is public, all workspace users are considered authorized.
 
         Args:
             channel_name (str): The channel name.
-            user_details_map (dict): A dictionary mapping user IDs to their respective details.
-            channel_details_map (dict): A dictionary mapping channel names to their respective details.
+            user_details_map (dict): A dictionary mapping user IDs to their
+                respective details.
+            channel_details_map (dict): A dictionary mapping channel names to their
+                respective details.
 
         Returns:
             list: A list of authorized identities(user details) for the given channel.
