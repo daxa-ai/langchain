@@ -8,6 +8,9 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MESSAGE_LIMIT = 1000
+DEFAULT_CHANNEL_TYPES = "public_channel,private_channel"
+
 
 class SlackAPIWrapper(BaseModel):
     """Wrapper for Slack API."""
@@ -22,7 +25,16 @@ class SlackAPIWrapper(BaseModel):
     """Client for Slack API"""
 
     def __init__(self, **kwargs: Any):
-        """Validate environment."""
+        """
+        Initialize the SlackAPIWrapper.
+
+        Args:
+            token (Optional[str]): Token for Slack API.
+            workspace_url (Optional[str]): URL of the Slack workspace.
+
+        Raises:
+            ImportError: If the 'slack_sdk' package is not installed.
+        """
         kwargs["token"] = get_from_dict_or_env(kwargs, "token", "SLACK_TOKEN", "")
         kwargs["workspace_url"] = get_from_dict_or_env(
             kwargs, "workspace_url", "SLACK_WORKSPACE_URL", ""
@@ -41,7 +53,7 @@ class SlackAPIWrapper(BaseModel):
         super().__init__(**kwargs)
 
     def get_channel_details_map(
-        self, types: str = "public_channel"
+        self, types: Optional[str] = DEFAULT_CHANNEL_TYPES
     ) -> Dict[str, Dict[str, str]]:
         """
         Get a dictionary mapping channel names to their respective details.
@@ -49,7 +61,7 @@ class SlackAPIWrapper(BaseModel):
 
         Args:
             types (str): Comma-separated list of types of channels to get details from.
-                Defaults to "public_channel".
+                Defaults to "public_channel,private_channel".
 
         Returns:
             Dict[str, Dict[str, str]]: A dictionary mapping channel names to their
@@ -68,9 +80,17 @@ class SlackAPIWrapper(BaseModel):
             }
         except Exception as e:
             logger.error(f"Error getting channel details map from Slack: {e}")
+            return {}
 
     def get_user_details_map(self) -> Dict[str, Dict[str, str]]:
-        """Get a dictionary mapping user IDs to their respective details."""
+        """
+        Get a dictionary mapping user IDs to their respective details.
+        Details include the user id, name, real name, and email.
+
+        Returns:
+            Dict[str, Dict[str, str]]: A dictionary mapping user IDs to their
+            respective details.
+        """
         try:
             response = self.slack_client.users_list()
             users = response.get("members", [])
@@ -86,8 +106,21 @@ class SlackAPIWrapper(BaseModel):
             logger.error(f"Error getting user details map from Slack: {e}")
             return {}
 
-    def get_messages(self, channel: str, limit: int = 1000) -> Any:
-        """Get messages from a channel."""
+    def get_messages(
+        self, channel: str, limit: Optional[int] = DEFAULT_MESSAGE_LIMIT
+    ) -> Any:
+        """
+        Get messages from a channel.
+
+        Args:
+            channel (str): The channel ID.
+            limit (int): The maximum number of messages to return. Defaults to 1000.
+
+        Returns:
+            Any: The messages from the channel.
+            If message has replies, the replies are included in the message as a list.
+            If messages are not available, returns None.
+        """
         try:
             response = self.slack_client.conversations_history(
                 channel=channel, limit=limit
@@ -108,7 +141,13 @@ class SlackAPIWrapper(BaseModel):
 
     def get_channel_members(self, channel: str) -> list:
         """
-        Get a list of members in a conversation
+        Get a list of members in a channel.
+
+        Args:
+            channel (str): The channel ID.
+
+        Returns:
+            list: A list of members in the channel.
         """
         try:
             response = self.slack_client.conversations_members(channel=channel)
@@ -119,7 +158,7 @@ class SlackAPIWrapper(BaseModel):
 
     def get_authorized_identities(
         self, channel_name: str, user_details_map: dict, channel_details_map: dict
-    ):
+    ) -> list:
         """
         Get a list of authorized identities for a given channel.
         An authorized identity is a user who has access to the channel.
@@ -147,7 +186,7 @@ class SlackAPIWrapper(BaseModel):
             if _is_private:
                 members = self.get_channel_members(channel_details.get("id"))
             else:
-                members = user_details_map.keys()
+                members = list(user_details_map.keys())
 
             for member in members:
                 user = user_details_map.get(member, {})

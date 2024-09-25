@@ -1,10 +1,19 @@
+import logging
 import os
 from typing import Iterator, Optional
 
 from langchain_core.documents import Document
 
 from langchain_community.document_loaders.base import BaseLoader
-from langchain_community.utilities.slack import SlackAPIWrapper, logger
+from langchain_community.utilities.slack import (
+    DEFAULT_CHANNEL_TYPES,
+    DEFAULT_MESSAGE_LIMIT,
+    SlackAPIWrapper,
+)
+
+# Configure logging
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 
 class SlackAPILoader(BaseLoader):
@@ -17,8 +26,8 @@ class SlackAPILoader(BaseLoader):
         workspace_url: Optional[str] = None,
         channel_name: Optional[str] = None,
         load_auth: Optional[bool] = False,
-        message_limit: Optional[int] = 1000,
-        channel_types: Optional[str] = "public_channel,private_channel",
+        message_limit: Optional[int] = DEFAULT_MESSAGE_LIMIT,
+        channel_types: Optional[str] = DEFAULT_CHANNEL_TYPES,
     ):
         """
         Initialize the SlackAPILoader.
@@ -49,6 +58,24 @@ class SlackAPILoader(BaseLoader):
         # Get user details map(user ID to user details)
         self.user_details_map = self.client.get_user_details_map()
 
+    @staticmethod
+    def _enriched_message_text(message: dict) -> str:
+        """
+        Enrich the message text with replies in the thread.
+
+        Args:
+            message (dict): The message to enrich.
+
+        Returns:
+            str: The enriched message text.
+        """
+        replies = message.get("replies", [])
+        if not replies:
+            return message.get("text", "")
+        # Get text from each reply(First reply is the original message)
+        reply_texts = [reply.get("text", "") for reply in replies]
+        return "\n\n".join(reply_texts)
+
     def lazy_load(self) -> Iterator[Document]:
         """
         Load and return documents from the Slack API.
@@ -72,7 +99,7 @@ class SlackAPILoader(BaseLoader):
             messages = self.client.get_messages(
                 channel=channel_id, limit=self.message_limit
             )
-            authorized_identities = []
+            authorized_identities: Optional[list] = []
             if messages and self.load_auth:
                 # Load authorized identities if load_auth is True
                 authorized_identities = self.client.get_authorized_identities(
@@ -85,7 +112,10 @@ class SlackAPILoader(BaseLoader):
                 )
 
     def _convert_message_to_document(
-        self, message: dict, channel_name: str, authorized_identities: list = []
+        self,
+        message: dict,
+        channel_name: str,
+        authorized_identities: Optional[list] = None,
     ) -> Document:
         """
         Convert a message to a Document object.
@@ -106,25 +136,11 @@ class SlackAPILoader(BaseLoader):
             metadata=metadata,
         )
 
-    def _enriched_message_text(self, message: dict) -> str:
-        """
-        Enrich the message text with replies in the thread.
-
-        Args:
-            message (dict): The message to enrich.
-
-        Returns:
-            str: The enriched message text.
-        """
-        replies = message.get("replies", [])
-        if not replies:
-            return message.get("text", "")
-        # Get text from each reply(First reply is the original message)
-        reply_texts = [reply.get("text", "") for reply in replies]
-        return "\n\n".join(reply_texts)
-
     def _get_message_metadata(
-        self, message: dict, channel_name: str, authorized_identities: list = []
+        self,
+        message: dict,
+        channel_name: str,
+        authorized_identities: Optional[list] = None,
     ) -> dict:
         """Create and return metadata for a given message and channel."""
         timestamp = message.get("ts", "")
@@ -135,7 +151,7 @@ class SlackAPILoader(BaseLoader):
             "channel": channel_name,
             "timestamp": timestamp,
             "user": user,
-            "authorized_identities": authorized_identities,
+            "authorized_identities": authorized_identities or [],
         }
 
     def _get_message_source(self, channel_name: str, user: str, timestamp: str) -> str:
