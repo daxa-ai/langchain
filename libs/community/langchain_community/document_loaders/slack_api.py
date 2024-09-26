@@ -154,7 +154,7 @@ class SlackAPILoader(BaseLoader):
             Document: A Document object representing the message.
         """
         text = self._enriched_message_text(message)
-        metadata = self._get_message_metadata(message, channel_name)
+        metadata = self._get_message_metadata(message, channel_name, text)
         return Document(
             page_content=text,
             metadata=metadata,
@@ -164,20 +164,26 @@ class SlackAPILoader(BaseLoader):
         self,
         message: dict,
         channel_name: str,
+        message_text: str,
     ) -> dict:
         """Create and return metadata for a given message and channel."""
         timestamp = message.get("ts", "")
         user = message.get("user", "")
         source = self._get_message_source(channel_name, user, timestamp)
-        authorized_identities = self._authorized_identities_map.get(channel_name, [])
-
-        return {
+        message_metadata = {
             "source": source,
             "channel": channel_name,
             "timestamp": timestamp,
             "user": user,
-            "authorized_identities": authorized_identities or [],
+            "size": f"{len(message_text)}",
         }
+        if self.load_auth:
+            authorized_identities = self._authorized_identities_map.get(
+                channel_name, []
+            )
+            message_metadata["authorized_identities"] = authorized_identities or []
+            message_metadata["owner"] = user
+        return message_metadata
 
     def _get_message_source(self, channel_name: str, user: str, timestamp: str) -> str:
         """
