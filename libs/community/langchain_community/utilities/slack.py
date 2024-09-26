@@ -94,6 +94,12 @@ class SlackAPIWrapper(BaseModel):
         try:
             response = self.slack_client.users_list()
             users = response.get("members", [])
+            # Filter out deleted users
+            users = [user for user in users if not user.get("deleted")]
+            # Filter out bots
+            users = [user for user in users if not user.get("is_bot")]
+            # Filter out app users
+            users = [user for user in users if not user.get("is_app_user")]
             return {
                 user["id"]: {
                     "name": user.get("name"),
