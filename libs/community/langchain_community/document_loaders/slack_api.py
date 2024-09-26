@@ -100,12 +100,12 @@ class SlackAPILoader(BaseLoader):
 
         channels = self._get_channels()
         # Get user details map(user ID to user details)
-        _user_details_map = self.client.get_user_details_map()
+        self.user_details_map = self.client.get_user_details_map()
 
         # Get authorized identities for each channel
         for channel_name in channels:
             _authorized_identities = self.client.get_authorized_identities(
-                channel_name, _user_details_map, self.channel_details_map
+                channel_name, self.user_details_map, self.channel_details_map
             )
             self._authorized_identities_map[channel_name] = _authorized_identities
 
@@ -182,7 +182,8 @@ class SlackAPILoader(BaseLoader):
                 channel_name, []
             )
             message_metadata["authorized_identities"] = authorized_identities or []
-            message_metadata["owner"] = user
+            name = self.user_details_map.get(user, {}).get("real_name")
+            message_metadata["owner"] = f"{user} ({name})" if name else user
         return message_metadata
 
     def _get_message_source(self, channel_name: str, user: str, timestamp: str) -> str:
