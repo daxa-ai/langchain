@@ -183,7 +183,7 @@ class SlackAPILoader(BaseLoader):
             )
             message_metadata["authorized_identities"] = authorized_identities or []
             name = self.user_details_map.get(user, {}).get("real_name")
-            message_metadata["owner"] = f"{user} ({name})" if name else user
+            message_metadata["owner"] = name or user
         return message_metadata
 
     def _get_message_source(self, channel_name: str, user: str, timestamp: str) -> str:
