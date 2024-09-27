@@ -2,6 +2,7 @@
 
 import logging
 import os
+import threading
 import uuid
 from importlib.metadata import version
 from typing import Any, Dict, Iterable, Iterator, List, Optional
@@ -33,6 +34,8 @@ class PebbloSafeLoader(BaseLoader):
     """
 
     _discover_sent: bool = False
+    _run_id: Optional[str] = None
+    _lock = threading.Lock()  # Lock to ensure thread safety
 
     def __init__(
         self,
@@ -46,10 +49,12 @@ class PebbloSafeLoader(BaseLoader):
         *,
         classifier_location: str = "local",
         anonymize_snippets: bool = False,
+        run_id: Optional[str] = None,
     ):
         if not name or not isinstance(name, str):
             raise NameError("Must specify a valid name.")
         self.app_name = name
+        self._run_id = run_id or self.generate_run_id()
         self.load_id = str(uuid.uuid4())
         self.loader = langchain_loader
         self.load_semantic = os.environ.get("PEBBLO_LOAD_SEMANTIC") or load_semantic
@@ -82,6 +87,23 @@ class PebbloSafeLoader(BaseLoader):
             anonymize_snippets=anonymize_snippets,
         )
         self.pb_client.send_loader_discover(self.app)
+
+    @classmethod
+    def generate_run_id(cls) -> str:
+        """Generate a unique run ID if not already generated.
+
+        Returns:
+            str: A unique run ID.
+        """
+        with cls._lock:
+            if cls._run_id is None:
+                cls._run_id = str(uuid.uuid4())
+        return cls._run_id
+
+    def get_run_id(self) -> str:
+        if self._run_id is None:
+            self._run_id = self.generate_run_id()
+        return self._run_id
 
     def load(self) -> List[Document]:
         """Load Documents.
@@ -175,6 +197,7 @@ class PebbloSafeLoader(BaseLoader):
             name=self.app_name,
             owner=self.owner,
             description=self.description,
+            run_id=self.get_run_id(),
             load_id=self.load_id,
             runtime=runtime,
             framework=framework,
