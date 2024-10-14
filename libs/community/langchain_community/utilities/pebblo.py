@@ -123,6 +123,8 @@ class App(BaseModel):
     """Description of the app."""
     load_id: str
     """Unique load_id of the app instance."""
+    run_id: str
+    """Unique run_id of the app instances."""
     runtime: Runtime
     """Runtime details of the app."""
     framework: Framework
@@ -144,6 +146,8 @@ class Doc(BaseModel):
     """List of documents with its metadata."""
     plugin_version: str
     """Pebblo plugin Version"""
+    run_id: str
+    """Unique run_id of the app instances ."""
     load_id: str
     """Unique load_id of the app instance."""
     loader_details: dict
@@ -600,6 +604,7 @@ class PebbloLoaderAPIWrapper(BaseModel):
             "owner": app.owner,
             "docs": docs,
             "plugin_version": PLUGIN_VERSION,
+            "run_id": app.run_id,
             "load_id": app.load_id,
             "loader_details": loader_details,
             "loading_end": "false",
