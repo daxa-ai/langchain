@@ -523,9 +523,9 @@ class PebbloLoaderAPIWrapper(BaseModel):
         if self.api_key:
             # Send docs to Pebblo cloud if api_key is present
             if self.classifier_location == "local":
-                # If local classifier is used add the classified information
-                # and remove doc content
-                self.update_doc_data(payload["docs"], classified_docs)
+                # If local classifier is used, update the payload for pebblo cloud
+                self.update_and_filter_docs(payload["docs"], classified_docs)
+
             # Remove the anonymize_snippets key from payload
             payload.pop("anonymize_snippets", None)
             self.send_docs_to_pebblo_cloud(payload)
@@ -738,16 +738,25 @@ class PebbloLoaderAPIWrapper(BaseModel):
         return docs, source_aggregate_size
 
     @staticmethod
-    def update_doc_data(docs: List[dict], classified_docs: dict) -> None:
+    def update_and_filter_docs(docs: List[dict], classified_docs: dict) -> None:
         """
-        Update the document data with classified information.
+        Update the document data with classified information, remove doc content
+        and filter out documents with no findings(entities or topics).
+        Update the docs list in-place.
 
         Args:
             docs (List[dict]): List of document data to be updated.
             classified_docs (dict): The dictionary containing classified documents.
         """
-        for doc_data in docs:
+        for i in range(len(docs) - 1, -1, -1):
+            doc_data = docs[i]
             classified_data = classified_docs.get(doc_data["pb_id"], {})
+            # Check if entities or topics are available
+            if not classified_data.get("entities") and not classified_data.get(
+                "topics"
+            ):
+                docs.pop(i)
+                continue
             # Update the document data with classified information
             doc_data.update(
                 {
