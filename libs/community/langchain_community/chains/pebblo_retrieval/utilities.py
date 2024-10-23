@@ -418,7 +418,7 @@ class PebbloRetrievalAPIWrapper(BaseModel):
         policy_thread.start()
 
     def _fetch_policy(self) -> None:
-        """Fetch policy from the Pebblo cloud or a file at regular intervals."""
+        """Fetch policy from the Pebblo cloud at regular intervals."""
         while True:
             try:
                 # Fetch identity policy from the Pebblo cloud
