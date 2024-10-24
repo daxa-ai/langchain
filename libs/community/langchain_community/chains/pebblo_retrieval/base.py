@@ -22,7 +22,7 @@ from pydantic import ConfigDict, Field, validator
 
 from langchain_community.chains.pebblo_retrieval.enforcement_filters import (
     SUPPORTED_VECTORSTORES,
-    set_enforcement_filters,
+    update_enforcement_filters,
 )
 from langchain_community.chains.pebblo_retrieval.models import (
     App,
@@ -313,8 +313,9 @@ class PebbloRetrievalQA(Chain):
         run_manager: CallbackManagerForChainRun,
     ) -> List[Document]:
         """Get docs."""
-        if not is_privileged_user:
-            set_enforcement_filters(self.retriever, auth_context, semantic_context)
+        update_enforcement_filters(
+            self.retriever, auth_context, semantic_context, is_privileged_user
+        )
         return self.retriever.get_relevant_documents(
             question, callbacks=run_manager.get_child()
         )
@@ -329,8 +330,9 @@ class PebbloRetrievalQA(Chain):
         run_manager: AsyncCallbackManagerForChainRun,
     ) -> List[Document]:
         """Get docs."""
-        if not is_privileged_user:
-            set_enforcement_filters(self.retriever, auth_context, semantic_context)
+        update_enforcement_filters(
+            self.retriever, auth_context, semantic_context, is_privileged_user
+        )
         return await self.retriever.aget_relevant_documents(
             question, callbacks=run_manager.get_child()
         )

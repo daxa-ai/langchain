@@ -82,9 +82,9 @@ def pebblo_retrieval_qa(retriever: FakeRetriever) -> PebbloRetrievalQA:
 
 
 @pytest.fixture
-def mock_set_enforcement_filters() -> Generator[Mock, None, None]:
+def mock_update_enforcement_filters() -> Generator[Mock, None, None]:
     with patch(
-        "langchain_community.chains.pebblo_retrieval.base.set_enforcement_filters"
+        "langchain_community.chains.pebblo_retrieval.base.update_enforcement_filters"
     ) as mock:
         yield mock
 
@@ -158,17 +158,24 @@ def test_validate_vectorstore(retriever: FakeRetriever) -> None:
 )
 def test_policy_enforcement(
     pebblo_retrieval_qa: PebbloRetrievalQA,
-    mock_set_enforcement_filters: Mock,
     is_privileged_user: bool,
     expected_count: int,
 ) -> None:
     """
     Test policy enforcement for both Privileged user and Non-privileged user.
-    The mock_get_semantic_context and set_enforcement_filters methods should be called
-    based on the user's role. Privileged user should not have any enforcement filters.
+    The get_semantic_context and _set_semantic_enforcement_filter methods should be
+    called based on the user's role.
+    Privileged user should not have any enforcement filters applied so these methods
+    should not be called.
     """
     question = "Tell me the secret of the universe"
     auth_context = AuthContext(user_id="user@email.com", user_auth=["group1", "group2"])
+    semantic_ctx = SemanticContext(
+        **{
+            "pebblo_semantic_topics": {"deny": ["harmful-advice"]},
+            "pebblo_semantic_entities": {"deny": ["credit-card"]},
+        }
+    )
     chain_input_obj = ChainInput(query=question, auth_context=auth_context)
 
     with patch.object(
@@ -176,9 +183,11 @@ def test_policy_enforcement(
         "is_privileged_user",
         return_value=is_privileged_user,
     ) as mock_is_privileged_user, patch.object(
-        pebblo_retrieval_qa.pb_client, "get_semantic_context", return_value=None
-    ) as mock_get_semantic_context:
+        pebblo_retrieval_qa.pb_client, "get_semantic_context", return_value=semantic_ctx
+    ) as mock_get_semantic_context, patch(
+        "langchain_community.chains.pebblo_retrieval.enforcement_filters._set_semantic_enforcement_filter"
+    ) as mock_set_semantic_enforcement_filter:
         _ = pebblo_retrieval_qa.invoke(chain_input_obj.dict())
         assert mock_is_privileged_user.call_count == 1
         assert mock_get_semantic_context.call_count == expected_count
-        assert mock_set_enforcement_filters.call_count == expected_count
+        assert mock_set_semantic_enforcement_filter.call_count == expected_count
