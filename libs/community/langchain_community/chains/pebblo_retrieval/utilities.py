@@ -100,6 +100,8 @@ class PebbloRetrievalAPIWrapper(BaseModel):
     """URL of the Pebblo Classifier"""
     cloud_url: Optional[str]
     """URL of the Pebblo Cloud"""
+    upload_snippets: bool = True
+    """Whether to send snippets to Pebblo Cloud if local classifier is used"""
 
     def __init__(self, **kwargs: Any):
         """Validate that api key in environment."""
@@ -407,8 +409,7 @@ class PebbloRetrievalAPIWrapper(BaseModel):
             logger.warning("An Exception caught in make_request: %s", e)
         return None
 
-    @staticmethod
-    def update_cloud_payload(payload: dict, pebblo_resp: Optional[dict]) -> None:
+    def update_cloud_payload(self, payload: dict, pebblo_resp: Optional[dict]) -> None:
         """
         Update the payload with response, prompt and context from Pebblo response.
 
@@ -420,13 +421,15 @@ class PebbloRetrievalAPIWrapper(BaseModel):
             # Update response, prompt and context from pebblo response
             response = payload.get("response", {})
             response.update(pebblo_resp.get("retrieval_data", {}).get("response", {}))
-            response.pop("data", None)
             prompt = payload.get("prompt", {})
             prompt.update(pebblo_resp.get("retrieval_data", {}).get("prompt", {}))
-            prompt.pop("data", None)
             context = payload.get("context", [])
-            for context_data in context:
-                context_data.pop("doc", None)
+            if not self.upload_snippets:
+                # Remove data and context from payload if upload_snippets is False
+                prompt.pop("data", None)
+                response.pop("data", None)
+                for context_data in context:
+                    context_data.pop("doc", None)
         else:
             payload["response"] = {}
             payload["prompt"] = {}
