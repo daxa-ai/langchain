@@ -417,23 +417,27 @@ class PebbloRetrievalAPIWrapper(BaseModel):
             payload (dict): Payload to be updated.
             pebblo_resp (Optional[dict]): Response from Pebblo server.
         """
+        prompt = payload.get("prompt", {})
+        response = payload.get("response", {})
+        context = payload.get("context", [])
         if pebblo_resp:
-            # Update response, prompt and context from pebblo response
-            response = payload.get("response", {})
+            # Update response, and prompt from pebblo response
             response.update(pebblo_resp.get("retrieval_data", {}).get("response", {}))
-            prompt = payload.get("prompt", {})
             prompt.update(pebblo_resp.get("retrieval_data", {}).get("prompt", {}))
-            context = payload.get("context", [])
-            if not self.upload_snippets:
-                # Remove data and context from payload if upload_snippets is False
-                prompt.pop("data", None)
-                response.pop("data", None)
-                for context_data in context:
-                    context_data.pop("doc", None)
-        else:
-            payload["response"] = {}
-            payload["prompt"] = {}
-            payload["context"] = []
+
+        if not self.upload_snippets or not pebblo_resp:
+            # Remove data and context if upload_snippets is False or no findings
+            prompt.pop("data", None)
+            response.pop("data", None)
+            for context_data in context:
+                context_data.pop("doc", None)
+        # Question: Why set fields to an empty dict/list if `pebblo_resp` is None?
+        # Other metadata may still be useful for the cloud.
+        # else:
+        #     payload["response"] = {}
+        #     payload["prompt"] = {}
+        #     payload["context"] = []
+
 
     @staticmethod
     async def amake_request(
