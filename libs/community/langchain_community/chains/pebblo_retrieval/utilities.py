@@ -458,7 +458,7 @@ class PebbloRetrievalAPIWrapper(BaseModel):
 
         """
         resp_json = None
-        policy_url = f"{self.cloud_url}{Routes.policy}"
+        policy_url = f"{self.cloud_url}{Routes.policy.value}"
         headers = self._make_headers(cloud_request=True)
         payload = {"app_name": app_name, "policy_type": policy_type.value}
         response = self.make_request("POST", policy_url, headers, payload)
