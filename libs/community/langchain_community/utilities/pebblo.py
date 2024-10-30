@@ -742,6 +742,8 @@ class PebbloLoaderAPIWrapper(BaseModel):
     def update_doc_data(self, docs: List[dict], classified_docs: dict) -> None:
         """
         Update the document data with classified information.
+        Remove doc content if no findings(entities or topics) are available OR
+        upload_snippets is False.
 
         Args:
             docs (List[dict]): List of document data to be updated.
@@ -749,15 +751,22 @@ class PebbloLoaderAPIWrapper(BaseModel):
         """
         for doc_data in docs:
             classified_data = classified_docs.get(doc_data["pb_id"], {})
+
             # Update the document data with classified information
+            classified_entities = classified_data.get("entities", {})
+            classified_topics = classified_data.get("topics", {})
             doc_data.update(
                 {
                     "pb_checksum": classified_data.get("pb_checksum"),
                     "loader_source_path": classified_data.get("loader_source_path"),
-                    "entities": classified_data.get("entities", {}),
-                    "topics": classified_data.get("topics", {}),
+                    "entities": classified_entities,
+                    "topics": classified_topics,
                 }
             )
+
             if not self.upload_snippets:
                 # Remove the document content if upload_snippets is False
-                doc_data.pop("doc")
+                doc_data.pop("doc", None)
+            elif not classified_entities and not classified_topics:
+                # Remove the document content if no findings are available
+                doc_data.pop("doc", None)

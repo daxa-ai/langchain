@@ -581,23 +581,47 @@ class PebbloRetrievalAPIWrapper(BaseModel):
             payload (dict): Payload to be updated.
             pebblo_resp (Optional[dict]): Response from Pebblo server.
         """
+
+        def remove_data_and_context() -> None:
+            """Remove data and context from the payload."""
+            prompt.pop("data", None)
+            response.pop("data", None)
+            for context_data in context:
+                context_data.pop("doc", None)
+
+        prompt = payload.get("prompt", {})
+        response = payload.get("response", {})
+        context = payload.get("context", [])
         if pebblo_resp:
-            # Update response, prompt and context from pebblo response
-            response = payload.get("response", {})
-            response.update(pebblo_resp.get("retrieval_data", {}).get("response", {}))
-            prompt = payload.get("prompt", {})
-            prompt.update(pebblo_resp.get("retrieval_data", {}).get("prompt", {}))
-            context = payload.get("context", [])
-            if not self.upload_snippets:
-                # Remove data and context from payload if upload_snippets is False
-                prompt.pop("data", None)
-                response.pop("data", None)
-                for context_data in context:
-                    context_data.pop("doc", None)
+            retrieval_data = pebblo_resp.get("retrieval_data", {})
+            # Get response and prompt findings from pebblo response
+            response_findings = retrieval_data.get("response", {})
+            prompt_findings = retrieval_data.get("prompt", {})
+            # Update response, and prompt with findings from pebblo response
+            response.update(response_findings)
+            prompt.update(prompt_findings)
+            # If no findings, remove data and context from the payload
+            if (
+                not response_findings.get("entities", [])
+                and not prompt_findings.get("entities", [])
+                and not response_findings.get("topics", [])
+                and not prompt_findings.get("topics", [])
+            ):
+                remove_data_and_context()
         else:
-            payload["response"] = {}
-            payload["prompt"] = {}
-            payload["context"] = []
+            # If pebblo response is None, remove data and context from the payload
+            remove_data_and_context()
+
+        if not self.upload_snippets:
+            # Remove data and context if upload_snippets is False
+            remove_data_and_context()
+
+        # Question: Why set fields to an empty dict/list if `pebblo_resp` is None?
+        # Other metadata may still be useful for the cloud.
+        # else:
+        #     payload["response"] = {}
+        #     payload["prompt"] = {}
+        #     payload["context"] = []
 
     @staticmethod
     async def amake_request(
