@@ -27,8 +27,9 @@ logger = logging.getLogger(__name__)
 PINECONE = "Pinecone"
 QDRANT = "Qdrant"
 PGVECTOR = "PGVector"
+PINECONE_VECTOR_STORE = "PineconeVectorStore"
 
-SUPPORTED_VECTORSTORES = {PINECONE, QDRANT, PGVECTOR}
+SUPPORTED_VECTORSTORES = {PINECONE, QDRANT, PGVECTOR, PINECONE_VECTOR_STORE}
 
 
 def clear_enforcement_filters(retriever: VectorStoreRetriever) -> None:
@@ -50,20 +51,23 @@ def clear_enforcement_filters(retriever: VectorStoreRetriever) -> None:
             )
 
 
-def set_enforcement_filters(
+def update_enforcement_filters(
     retriever: VectorStoreRetriever,
     auth_context: Optional[AuthContext],
     semantic_context: Optional[SemanticContext],
+    is_privileged_user: bool = False,
 ) -> None:
     """
-    Set identity and semantic enforcement filters in the retriever.
+    Update identity and semantic enforcement filters in the retriever.
     """
     # Clear existing enforcement filters
     clear_enforcement_filters(retriever)
-    if auth_context is not None:
-        _set_identity_enforcement_filter(retriever, auth_context)
-    if semantic_context is not None:
-        _set_semantic_enforcement_filter(retriever, semantic_context)
+    # Set new enforcement filters if not a privileged user
+    if not is_privileged_user:
+        if auth_context is not None:
+            _set_identity_enforcement_filter(retriever, auth_context)
+        if semantic_context is not None:
+            _set_semantic_enforcement_filter(retriever, semantic_context)
 
 
 def _apply_qdrant_semantic_filter(
@@ -505,7 +509,7 @@ def _set_identity_enforcement_filter(
     of the retriever based on the type of the vectorstore.
     """
     search_kwargs = retriever.search_kwargs
-    if retriever.vectorstore.__class__.__name__ == PINECONE:
+    if retriever.vectorstore.__class__.__name__ in [PINECONE, PINECONE_VECTOR_STORE]:
         _apply_pinecone_authorization_filter(search_kwargs, auth_context)
     elif retriever.vectorstore.__class__.__name__ == QDRANT:
         _apply_qdrant_authorization_filter(search_kwargs, auth_context)
