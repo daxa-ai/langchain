@@ -228,7 +228,11 @@ def get_loader_full_path(loader: BaseLoader) -> str:
             if location and "channel" in loader_dict:
                 channel = loader_dict["channel"]
                 if channel:
-                    location = f"{location}/{channel}"
+                    location = f"{location}/{str(channel)}"
+            if "title" in loader_dict:  # For GoogleDriveLoader
+                title = loader_dict["title"]
+                if title:
+                    location = f"{location}: {str(title)}"
         elif "path" in loader_dict:
             location = loader_dict["path"]
         elif "file_path" in loader_dict:
